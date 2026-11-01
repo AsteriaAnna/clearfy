@@ -16,6 +16,7 @@ import {
   todayISO,
   transcribeStream,
   updateEvent,
+  quitApp,
 } from "./api";
 
 type Theme = "pink" | "sage" | "blue";
@@ -30,6 +31,12 @@ const THEMES: { id: Theme; label: string }[] = [
 ];
 
 const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+const EN_WEEKDAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+const EN_MONTHS = [
+  "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
+];
+const CN_WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -307,6 +314,15 @@ export default function App() {
     return cells;
   }, []);
 
+  const hero = useMemo(() => {
+    const d = new Date();
+    return {
+      en: `${EN_WEEKDAYS[d.getDay()]} · ${EN_MONTHS[d.getMonth()]} ${d.getDate()}`,
+      big: `${pad(d.getMonth() + 1)}.${pad(d.getDate())}`,
+      sub: `${CN_WEEKDAYS[d.getDay()]} · 今天`,
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="titlebar" data-tauri-drag-region>
@@ -349,6 +365,16 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {template === "a" && scale === "day" && view === "today" && (
+            <section className="hero">
+              <div className="hero-main">
+                <div className="hero-eyebrow">{hero.en}</div>
+                <div className="hero-date"><span className="big">{hero.big}</span><span className="hero-sub">{hero.sub}</span></div>
+              </div>
+              <div className="hero-meta">{timed.length} 项时间 · {untimed.length} 项待安排</div>
+            </section>
+          )}
 
           <main className="content">
             {loading ? <div className="empty">正在打开 Clarify…</div> : null}
@@ -556,6 +582,15 @@ function Settings({ theme, setTheme, onBack }: { theme: Theme; setTheme: (t: The
           {saved && <span className="muted">{saved}</span>}
         </div>
         <p className="muted">Key 只存本机 AppData，不写入仓库；正式版将迁移到 Windows 凭据管理器。语音使用豆包流式识别（2.0 小时版）。</p>
+      </div>
+      <h2>窗口与退出</h2>
+      <div className="set-card">
+        <div className="field-row">
+          <span>主窗 / 悬浮窗位置与尺寸</span>
+          <span className="pill ok">自动记住</span>
+        </div>
+        <p className="muted">关闭主窗口只是隐藏，Clarify 会继续在悬浮窗运行。</p>
+        <button className="danger-btn" onClick={() => void quitApp()}>退出 Clarify</button>
       </div>
       <h2>关于</h2>
       <p className="muted">Clarify · 本地运行 · 无账号 · 数据只在本机</p>

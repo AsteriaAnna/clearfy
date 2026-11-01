@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window";
-import { ClarifyEvent, completeEvent, incrementCount, isTauri, listOpen } from "../api";
+import { getCurrentWindow } from "@tauri-apps/api/window";import { ClarifyEvent, completeEvent, incrementCount, isTauri, listOpen } from "../api";
 
 type Theme = "pink" | "sage" | "blue";
 type Template = "a" | "b";
 type Filter = "today" | "all";
 
-const WIDTH = 300;
-const HEIGHT_KEY = "clarify.overlay.height";
 const TEMPLATE_KEY = "clarify.overlay.template";
 
 function pad(n: number) {
@@ -67,7 +64,7 @@ export default function Overlay() {
   const [template, setTemplate] = useState<Template>(() => (localStorage.getItem(TEMPLATE_KEY) as Template) || "a");
   const [filter, setFilter] = useState<Filter>("today");
   const [theme] = useState<Theme>(() => (localStorage.getItem("clarify.theme") as Theme) || "pink");
-  const [height, setHeight] = useState<number>(() => Number(localStorage.getItem(HEIGHT_KEY)) || 220);
+  const [height, setHeight] = useState<number>(() => window.innerHeight || 220);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -77,22 +74,17 @@ export default function Overlay() {
     localStorage.setItem(TEMPLATE_KEY, template);
   }, [template]);
 
-  // 恢复高度 + 跟随窗口尺寸变化
+  // 窗口位置/尺寸由 Rust 侧持久化并恢复；这里只跟随当前高度计算可显示条数
   useEffect(() => {
     if (!isTauri) return;
     const win = getCurrentWindow();
-    void win.setSize(new LogicalSize(WIDTH, height));
     let unlisten: (() => void) | undefined;
     void win.onResized(({ payload }) => {
-      const physical = payload.height;
       void win.scaleFactor().then((scale) => {
-        const logical = Math.round(physical / scale);
-        setHeight(logical);
-        localStorage.setItem(HEIGHT_KEY, String(logical));
+        setHeight(Math.round(payload.height / scale));
       });
     }).then((fn) => { unlisten = fn; });
     return () => unlisten?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load() {

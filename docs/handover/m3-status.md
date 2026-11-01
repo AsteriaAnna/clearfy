@@ -79,3 +79,43 @@
 - 两个 Key 已在对话中出现；建议本轮测试后在控制台重置/轮换
 - 本仓库不含 Key（已 grep 确认）；Key 只在 AppData 本地配置中
 
+---
+
+# v0.1.0 可试用包（2026-11-01 晚，追加）
+
+## 窗口位置/尺寸记忆
+
+- Rust 侧 `window-state.json`（`%LOCALAPPDATA%\com.clarify.desktop\`）保存主窗 + 悬浮窗物理位置/尺寸
+- 移动/缩放事件 300ms 节流写入；关闭主窗（隐藏）时强制保存
+- 启动恢复：主窗直接应用；悬浮窗固定宽 300、高度夹在 180–420 逻辑像素；越界回退默认右下角
+- 跨 150% DPI 实测：移动/关闭/重启后位置与尺寸恢复正确
+
+## 设置页「退出 Clarify」
+
+- 新增 `quit_app` 命令（`app.exit(0)`）
+- 设置 → 窗口与退出 → 「退出 Clarify」；CDP 实测点击后进程退出码 0
+- 关闭主窗仍为隐藏（悬浮窗继续运行），符合 Q20
+
+## 视觉打磨
+
+- 主窗新增 hero 日期区：`SUNDAY · NOVEMBER 1` / 大号衬线 `11.01 周日 · 今天` / 右侧事项统计
+- 行改为纯白圆角卡片 + 柔和阴影 + hover 微位移；纸感径向渐变背景；品牌字距优化；时段时间细线保持
+- 悬浮窗保持视觉 v1.0 参数（300 宽、时间细线、计数 chip、footer）
+- 应用图标替换为 Clarify 雾粉渐变球
+
+## 打包与验证
+
+- 安装包：`target/release/bundle/nsis/Clarify_0.1.0_x64-setup.exe`（2.60 MiB，NSIS x64）
+- 静默安装成功：`%LOCALAPPDATA%\Clarify\clarify.exe`，HKCU 卸载项与开始菜单快捷方式
+- 安装后启动、窗口恢复、退出、悬浮窗均实测通过
+- 首次安装验证后已清空测试事件（数据库为空，AI Key 配置保留本机）
+- 已知：未签名（SmartScreen 提示）、单屏恢复（多屏夹取未做）
+
+## 交付截图
+
+- 主窗：`docs/screenshots/v1-main-app.png`
+- 悬浮窗：`docs/screenshots/v1-overlay-app.png`
+- 桌面实装：`docs/screenshots/v1-installed-final.png`
+- 语音链路：`docs/screenshots/m3-voice-stream-crop.png`
+
+

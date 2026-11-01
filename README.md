@@ -6,16 +6,17 @@
 
 ## 当前状态
 
-- **阶段**：M1 后端与底层已跑通（2026-11-01）：MSVC 已安装并验证；`clarify-core` 7/7 测试通过；Tauri 二进制构建并启动成功。下一步接前端壳与悬浮窗。
+- **阶段**：M1–M3 主流程可试用（2026-11-01）：主窗 + 悬浮窗 + 全局热键 + 豆包流式语音 + DeepSeek 解析；窗口位置/尺寸记忆；已产出 Windows NSIS 安装包（`target/release/bundle/nsis/`）。
 - **最新权威记录**：[docs/00-product-decisions.md](docs/00-product-decisions.md)（产品定义 v1.2，最终收口）
 - **核心定义**：无收件箱/标签/通知/首启引导/备份导出；只有"未完成/已完成"；完成 24h 内可恢复、之后物理删除；事件 = 动作标题 + 可选字段（时间/重复/计数）；显示模板 A 时间轴 / B 清单；主窗 = 一个主页面 + 设置；计数目标可超额、周期结束才过期
-- **下一步**：视觉 v1.0 接入 React（主窗 A/B、详情抽屉、设置、已完成折叠）→ 悬浮窗（时间细线/下拉拉伸/计数 +1）→ AI 网关客户端（mock/规则模式先行）→ M1 验收
+- **下一步**：安装包试用反馈 → 视觉细节回归 → M4（激活码/官方网关/更新/签名）
+- **试用说明**：[docs/handover/v0.1.0-release-notes.md](docs/handover/v0.1.0-release-notes.md)
 
 ## 文档索引
 
 | 文件 | 内容 |
 |---|---|
-| [00-product-decisions.md](docs/00-product-decisions.md) | **产品定义讨论记录 v1.1（当前权威）** |
+| [00-product-decisions.md](docs/00-product-decisions.md) | **产品定义讨论记录 v1.2（当前权威）** |
 | [00-charter.md](docs/00-charter.md) | 项目宪章/术语表（v1.1，已按产品决策重写） |
 | [01-prd.md](docs/01-prd.md) | PRD：F1~F12 功能、验收标准、指标、开放问题 |
 | [02-ux-spec.md](docs/02-ux-spec.md) | 交互规范：页面地图、A/B 模板、状态矩阵、文案、快捷键 |
@@ -29,9 +30,8 @@
 | [10-risks-decisions.md](docs/10-risks-decisions.md) | 决策登记（D 系列）与风险登记（R 系列） |
 | [11-release-ops.md](docs/11-release-ops.md) | 发布/签名/更新/隐私/许可/运营 |
 | [eval/](docs/eval/) | 62 条中文口语评估集 + 期望 JSON + 指标规范 |
-| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.5.html](docs/prototype-v0.5.html) | 视觉 v0.5（暖纸感+三主题；悬浮窗时间细线/下拉拉伸/计数可超额）；对比页 [widget-lab.html](docs/widget-lab.html) + [截图](docs/screenshots/) |
-| [prototype-v0.4.html](docs/prototype-v0.4.html)、[v0.3](docs/prototype-v0.3.html)、[v0.2](docs/prototype-v0.2.html) | 历史视觉原型 |
-| [docs/handover/](docs/handover/) | 红队审查报告、交接手册（进行中） |
+| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.5.html](docs/prototype-v0.5.html) | 视觉 v1.0（已冻结；暖纸感+三主题；悬浮窗时间细线/下拉拉伸/计数可超额）；对比页 [widget-lab.html](docs/widget-lab.html) + [截图](docs/screenshots/) |
+| [docs/handover/](docs/handover/) | 交接手册、M1/M2/M3 进度、v0.1.0 安装包说明 |
 | [research/](docs/research/) | 早期技术/产品研究（历史证据） |
 | [design-v0.1~v0.3](docs/design-v0.3.md) | 历史设计稿（已被产品决策取代） |
 | [prototype-v0.1.html](docs/prototype-v0.1.html) | 旧线框（已过时，待删/替换为 v0.2） |

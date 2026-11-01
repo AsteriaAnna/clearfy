@@ -1,16 +1,38 @@
+use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use base64::Engine;
 use chrono::Local;
 use clarify_core::{Clock, Event, NewEvent, Store, SystemClock};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use serde::{Deserialize, Serialize};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
+};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 pub mod ai;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct WindowRect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct WindowStateFile {
+    main: Option<WindowRect>,
+    overlay: Option<WindowRect>,
+}
+
 struct AppState {
     store: Mutex<Store>,
     clock: SystemClock,
+    window_state: Mutex<WindowStateFile>,
+    last_state_save: Mutex<Instant>,
 }
 
 fn err(e: impl std::fmt::Display) -> String {
@@ -234,6 +256,88 @@ fn db_path(app: &tauri::AppHandle) -> std::path::PathBuf {
     dir.join("clarify.db")
 }
 
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+fn window_state_path(app: &AppHandle) -> PathBuf {
+    let dir = app
+        .path()
+        .app_local_data_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&dir);
+    dir.join("window-state.json")
+}
+
+fn load_window_state(app: &AppHandle) -> WindowStateFile {
+    std::fs::read_to_string(window_state_path(app))
+        .ok()
+        .and_then(|s| serde_json::from_str(s.trim_start_matches('\u{feff}')).ok())
+        .unwrap_or_default()
+}
+
+fn persist_window_state(app: &AppHandle, state: &WindowStateFile) {
+    if let Ok(s) = serde_json::to_string_pretty(state) {
+        let _ = std::fs::write(window_state_path(app), s);
+    }
+}
+
+fn rect_on_screen(app: &AppHandle, rect: &WindowRect) -> bool {
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        let size = monitor.size();
+        let w = size.width as f64;
+        let h = size.height as f64;
+        rect.x > -rect.width + 80.0
+            && rect.y > -rect.height + 80.0
+            && rect.x < w - 80.0
+            && rect.y < h - 80.0
+    } else {
+        true
+    }
+}
+
+fn apply_window_rect(window: &WebviewWindow, rect: &WindowRect) {
+    let _ = window.set_size(PhysicalSize::new(
+        rect.width.max(240.0) as u32,
+        rect.height.max(160.0) as u32,
+    ));
+    let _ = window.set_position(PhysicalPosition::new(rect.x, rect.y));
+}
+
+fn save_window_rect(window: &tauri::Window, force: bool) {
+    let app = window.app_handle();
+    let Some(state) = app.try_state::<AppState>() else { return };
+    let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) else {
+        return;
+    };
+    let rect = WindowRect {
+        x: pos.x as f64,
+        y: pos.y as f64,
+        width: size.width as f64,
+        height: size.height as f64,
+    };
+    let now = Instant::now();
+    let should = force || {
+        let last = state.last_state_save.lock().unwrap();
+        now.duration_since(*last).as_millis() >= 300
+    };
+    if !should {
+        return;
+    }
+    let snapshot = {
+        let mut ws = state.window_state.lock().unwrap();
+        match window.label() {
+            "main" => ws.main = Some(rect),
+            "overlay" => ws.overlay = Some(rect),
+            _ => return,
+        }
+        ws.clone()
+    };
+    *state.last_state_save.lock().unwrap() = now;
+    persist_window_state(app, &snapshot);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let capture_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space);
@@ -271,9 +375,12 @@ pub fn run() {
             // 启动时做一次 24h 物理清理 + 计数周期复位
             let clock = SystemClock::default();
             let _ = store.purge(&clock);
+            let wstate = load_window_state(app.handle());
             app.manage(AppState {
                 store: Mutex::new(store),
                 clock,
+                window_state: Mutex::new(wstate.clone()),
+                last_state_save: Mutex::new(Instant::now()),
             });
             app.global_shortcut()
                 .register(capture_shortcut)
@@ -281,6 +388,15 @@ pub fn run() {
             app.global_shortcut()
                 .register(voice_shortcut)
                 .map_err(|e| e.to_string())?;
+
+            // 恢复主窗位置/尺寸
+            if let Some(rect) = &wstate.main {
+                if rect_on_screen(app.handle(), rect) {
+                    if let Some(main) = app.get_webview_window("main") {
+                        apply_window_rect(&main, rect);
+                    }
+                }
+            }
 
             // 浮窗：独立透明窗口，300×220 起，A 最高 396 / B 最高 420
             let builder = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
@@ -295,22 +411,40 @@ pub fn run() {
                 .shadow(false)
                 .resizable(true);
             let overlay = builder.build()?;
-            if let Ok(Some(monitor)) = app.primary_monitor() {
-                let scale = monitor.scale_factor();
-                let size = monitor.size();
-                let x = size.width as f64 - 300.0 * scale - 24.0 * scale;
-                let y = size.height as f64 - 220.0 * scale - 80.0 * scale;
-                let _ = overlay.set_position(PhysicalPosition::new(x, y));
+            let mut overlay_restored = false;
+            if let Some(rect) = &wstate.overlay {
+                if rect_on_screen(app.handle(), rect) {
+                    let scale = overlay.scale_factor().unwrap_or(1.0);
+                    let width = (300.0 * scale) as u32;
+                    let height = rect.height.clamp(180.0 * scale, 420.0 * scale) as u32;
+                    let _ = overlay.set_size(PhysicalSize::new(width, height));
+                    let _ = overlay.set_position(PhysicalPosition::new(rect.x, rect.y));
+                    overlay_restored = true;
+                }
+            }
+            if !overlay_restored {
+                if let Ok(Some(monitor)) = app.primary_monitor() {
+                    let scale = monitor.scale_factor();
+                    let size = monitor.size();
+                    let x = size.width as f64 - 300.0 * scale - 24.0 * scale;
+                    let y = size.height as f64 - 220.0 * scale - 80.0 * scale;
+                    let _ = overlay.set_position(PhysicalPosition::new(x, y));
+                }
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. } => {
+                save_window_rect(window, true);
                 if window.label() == "main" {
                     api.prevent_close();
                     let _ = window.hide();
                 }
             }
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                save_window_rect(window, false);
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             list_open,
@@ -328,7 +462,8 @@ pub fn run() {
             save_ai_keys,
             ai_parse,
             transcribe_audio,
-            transcribe_stream
+            transcribe_stream,
+            quit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

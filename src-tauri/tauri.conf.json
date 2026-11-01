@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Clarify",
-        "width": 1180,
-        "height": 760,
+        "width": 1200,
+        "height": 800,
         "minWidth": 960,
         "minHeight": 640,
         "decorations": false,
@@ -27,12 +27,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "publisher": "Clarify",
+    "copyright": "Clarify",
+    "shortDescription": "把生活交给 Clarify，解放你的脑空间",
+    "longDescription": "本地优先的 AI 协作待办：全局热键语音捕捉、AI 解析、悬浮窗始终可见。",
+    "category": "Productivity",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
       "icons/icon.ico"
     ]
   }

@@ -219,4 +219,9 @@ export async function transcribeStream(pcmBase64: string): Promise<string> {
   return invoke<string>("transcribe_stream", { pcmBase64 });
 }
 
+export async function quitApp(): Promise<void> {
+  if (!isTauri) return;
+  return invoke<void>("quit_app");
+}
+
 export { todayISO };
