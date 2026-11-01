@@ -48,13 +48,25 @@
 - `LICENSE`（MIT）
 - 网关代码没有 Key；Key 只在云平台环境变量/Secrets
 
+## 部署状态（2026-11-01）
+
+- ✅ 阿里云 FC 已部署：函数 `clarify-gateway`（cn-hangzhou，nodejs20，256MB）
+- ✅ HTTP 触发器（匿名 GET/POST）
+- ✅ 函数 URL：`https://clarify-gateway-dsidnsbafc.cn-hangzhou.fcapp.run`
+- ✅ `/v1/health` 正常
+- ✅ `/v1/parse` 实测 DeepSeek 解析成功
+- ✅ `/v1/transcribe` 实测豆包流式识别成功
+- ✅ 额度模式：`QUOTA_MODE=client`，免费 5 次解析 + 30 秒语音/天
+- ✅ 激活码 Secret 在本机 `%LOCALAPPDATA%\com.clarify.desktop\gateway-activation-secret.txt`
+- ⚠️ `s deploy` 输出把函数环境变量打印出来了；公开前建议轮换 DeepSeek/豆包 Key
+- ⚠️ 当前函数 URL 匿名可调，客户端计额度可被绕开；有量后加 Tablestore/Redis/API 网关限流
+
 ## 待用户操作（部署）
 
-1. 阿里云创建 Tablestore 实例 + 表 `clarify_quota`（主键 `pk` String）
-2. 创建函数计算 FC Node.js 20 函数，上传 `gateway/clarify-gateway.zip`
-3. 配置环境变量（见 `gateway/README.md`）
-4. 创建 HTTP 触发器，拿到函数 URL
-5. 把 URL 发回；不要发 AccessKey/API Key
+1. 打开函数 URL `/v1/health` 确认
+2. **立刻禁用/删除用于部署的 AccessKey**（已贴到对话里）
+3. 找 2～3 个不同省份/运营商的朋友打开 `/v1/health` 测大陆访问
+4. 反馈结果：稳定则用这个 URL 切客户端；不稳定则走阿里云国内域名/备用方案
 
 ## 部署后我继续做
 

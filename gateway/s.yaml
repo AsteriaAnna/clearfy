@@ -12,15 +12,14 @@ resources:
       handler: index.handler
       code: ./
       memorySize: 256
+      cpu: 0.25
+      diskSize: 512
       timeout: 60
+      internetAccess: true
       environmentVariables:
         DEEPSEEK_API_KEY: ${env(DEEPSEEK_API_KEY)}
         DOUBAO_API_KEY: ${env(DOUBAO_API_KEY)}
         ACTIVATION_SECRET: ${env(ACTIVATION_SECRET)}
-        TABLESTORE_ENDPOINT: ${env(TABLESTORE_ENDPOINT)}
-        TABLESTORE_INSTANCE: ${env(TABLESTORE_INSTANCE)}
-        ALIBABA_CLOUD_ACCESS_KEY_ID: ${env(ALIBABA_CLOUD_ACCESS_KEY_ID)}
-        ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${env(ALIBABA_CLOUD_ACCESS_KEY_SECRET)}
         QUOTA_MODE: client
         FREE_PARSE_PER_DAY: '5'
         FREE_VOICE_SECONDS_PER_DAY: '30'

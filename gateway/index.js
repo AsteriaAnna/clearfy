@@ -6,12 +6,22 @@
  */
 const { handle } = require('./lib/app');
 
+function coerceEvent(event) {
+  let e = event;
+  if (Buffer.isBuffer(e)) {
+    try { e = JSON.parse(e.toString('utf8')); } catch { e = {}; }
+  } else if (typeof e === 'string') {
+    try { e = JSON.parse(e); } catch { e = {}; }
+  }
+  return e || {};
+}
+
 function normalize(event) {
-  const e = event || {};
+  const e = coerceEvent(event);
   const reqContext = e.requestContext || {};
   const http = reqContext.http || {};
   const method = (e.httpMethod || http.method || 'GET').toUpperCase();
-  let path = e.path || e.rawPath || http.path || '/';
+  let path = http.path || e.rawPath || e.path || '/';
   if (typeof path === 'string' && path.includes('?')) path = path.split('?')[0];
   const query = e.queryParameters || e.queryStringParameters || {};
   let body = e.body || '';
