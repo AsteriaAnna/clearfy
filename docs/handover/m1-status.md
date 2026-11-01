@@ -2,14 +2,14 @@
 
 ## 环境结论
 
-- 本机账号为**非提升管理员**，MSVC Build Tools 安装需要 UAC 授权（第一次弹窗被取消），因此当前不使用 MSVC。
-- 已改用**便携 MinGW + Rust GNU 工具链**，无需管理员权限即可编译/运行 Tauri 应用：
-  - Rust：`stable-x86_64-pc-windows-gnu`（rustc 1.99.1）
-  - MinGW：`BrechtSanders.WinLibs.POSIX.UCRT`（GCC 16.2.0，winget 安装）
-  - 初始化：`. .\scripts\dev-env.ps1`（设置 PATH/CC/CXX/AR/RUSTUP_TOOLCHAIN）
+- **MSVC 已安装并验证**（2026-11-01 19:40）：Visual Studio Build Tools 2022，`cl.exe 14.44.35207`，Windows 11 SDK 22621。
+  - 验证命令（Developer PowerShell 环境）：
+    ```powershell
+    cmd /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat`" && cargo test -p clarify-core && cargo build -p clarify"
+    ```
+  - 结果：`clarify-core` 7/7 测试通过；`target/debug/clarify.exe` 构建成功并启动运行（MSVC 产物约 15MB）。
+- **备用 GNU 工具链**（无管理员权限时使用）：便携 MinGW + Rust `stable-x86_64-pc-windows-gnu`；初始化 `. .\scripts\dev-env.ps1`。两条工具链均可构建，正式发布默认用 MSVC。
 - `pnpm build`（前端 Vite）通过。
-- `cargo +stable-x86_64-pc-windows-gnu build -p clarify` 通过，`target/debug/clarify.exe` 可启动（已做 4 秒运行冒烟）。
-- 备注：`cdylib` 在 GNU 下链接报 `export ordinal too large`，故桌面开发把 `src-tauri` 的 crate-type 暂改为 `rlib`；正式发布仍建议用 MSVC 工具链（有管理员权限后安装）。
 
 ## 已实现（backend core）
 
