@@ -1,0 +1,968 @@
+{
+  "version": "1.0",
+  "contract_version": "1.0",
+  "anchor": {
+    "now": "2026-11-01T16:30:00+08:00",
+    "timezone": "Asia/Shanghai"
+  },
+  "description": "每个 id 的 actions 数组必须整体通过 docs/05-contracts/ai-json.md 的输出 Schema 与语义校验。",
+  "expected": {
+    "s001": {
+      "actions": [
+        {
+          "title": "跟张总开会",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T15:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s002": {
+      "actions": [
+        {
+          "title": "跟客户吃饭",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-03T12:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s003": {
+      "actions": [
+        {
+          "title": "交周报",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-06T10:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s004": {
+      "actions": [
+        {
+          "title": "去健身房",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-01T18:30:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s005": {
+      "actions": [
+        {
+          "title": "体检",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-05T09:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s006": {
+      "actions": [
+        {
+          "title": "面试",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-04T14:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s007": {
+      "actions": [
+        {
+          "title": "喝水",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-01T19:30:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s008": {
+      "actions": [
+        {
+          "title": "给快递打电话",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-01T17:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s009": {
+      "actions": [
+        {
+          "title": "跑步",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T07:20:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s010": {
+      "actions": [
+        {
+          "title": "开季度会",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-12-01T15:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s011": {
+      "actions": [
+        {
+          "title": "写方案",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-02T14:00:00+08:00",
+            "end": "2026-11-02T16:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s012": {
+      "actions": [
+        {
+          "title": "开评审会",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-04T09:00:00+08:00",
+            "end": "2026-11-04T11:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s013": {
+      "actions": [
+        {
+          "title": "整理房间",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-01T17:00:00+08:00",
+            "end": "2026-11-01T19:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s014": {
+      "actions": [
+        {
+          "title": "跟设计对需求",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-02T14:00:00+08:00",
+            "end": "2026-11-02T15:30:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s015": {
+      "actions": [
+        {
+          "title": "搬家",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-07T13:00:00+08:00",
+            "end": "2026-11-07T17:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s016": {
+      "actions": [
+        {
+          "title": "陪孩子上课",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-08T10:00:00+08:00",
+            "end": "2026-11-08T12:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s017": {
+      "actions": [
+        {
+          "title": "布置会场",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-02T14:00:00+08:00",
+            "end": "2026-11-02T16:00:00+08:00",
+            "deadline": "2026-11-02T17:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s018": {
+      "actions": [
+        {
+          "title": "开一对一",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-02T10:30:00+08:00",
+            "end": "2026-11-02T11:30:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s019": {
+      "actions": [
+        {
+          "title": "喝咖啡",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T15:00:00+08:00"
+          },
+          "repeat": {
+            "freq": "day",
+            "interval": 1,
+            "weekdays": null
+          },
+          "count": null
+        }
+      ]
+    },
+    "s020": {
+      "actions": [
+        {
+          "title": "跑步",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T07:00:00+08:00"
+          },
+          "repeat": {
+            "freq": "day",
+            "interval": 1,
+            "weekdays": null
+          },
+          "count": null
+        }
+      ]
+    },
+    "s021": {
+      "actions": [
+        {
+          "title": "开周会",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T09:30:00+08:00"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 1,
+            "weekdays": [
+              1
+            ]
+          },
+          "count": null
+        }
+      ]
+    },
+    "s022": {
+      "actions": [
+        {
+          "title": "健身",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T20:00:00+08:00"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 1,
+            "weekdays": [
+              1,
+              3,
+              5
+            ]
+          },
+          "count": null
+        }
+      ]
+    },
+    "s023": {
+      "actions": [
+        {
+          "title": "做复盘",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-04T14:00:00+08:00"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 2,
+            "weekdays": [
+              3
+            ]
+          },
+          "count": null
+        }
+      ]
+    },
+    "s024": {
+      "actions": [
+        {
+          "title": "交房租",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-15T10:00:00+08:00"
+          },
+          "repeat": {
+            "freq": "month",
+            "interval": 1,
+            "weekdays": null
+          },
+          "count": null
+        }
+      ]
+    },
+    "s025": {
+      "actions": [
+        {
+          "title": "陪家人",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-07"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 1,
+            "weekdays": [
+              6
+            ]
+          },
+          "count": null
+        }
+      ]
+    },
+    "s026": {
+      "actions": [
+        {
+          "title": "倒垃圾",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-03T16:00:00+08:00"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 1,
+            "weekdays": [
+              2,
+              4
+            ]
+          },
+          "count": null
+        }
+      ]
+    },
+    "s027": {
+      "actions": [
+        {
+          "title": "喝水",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 3,
+            "period": "day"
+          }
+        }
+      ]
+    },
+    "s028": {
+      "actions": [
+        {
+          "title": "去健身房",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 3,
+            "period": "week"
+          }
+        }
+      ]
+    },
+    "s029": {
+      "actions": [
+        {
+          "title": "喝水",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 8,
+            "period": "day"
+          }
+        }
+      ]
+    },
+    "s030": {
+      "actions": [
+        {
+          "title": "背单词",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 50,
+            "period": "day"
+          }
+        }
+      ]
+    },
+    "s031": {
+      "actions": [
+        {
+          "title": "读书",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 2,
+            "period": "week"
+          }
+        }
+      ]
+    },
+    "s032": {
+      "actions": [
+        {
+          "title": "做俯卧撑",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 30,
+            "period": "day"
+          }
+        }
+      ]
+    },
+    "s033": {
+      "actions": [
+        {
+          "title": "买牛奶",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s034": {
+      "actions": [
+        {
+          "title": "给妈妈打电话",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s035": {
+      "actions": [
+        {
+          "title": "回复王工邮件",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s036": {
+      "actions": [
+        {
+          "title": "学钓鱼",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s037": {
+      "actions": [
+        {
+          "title": "报销发票",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s038": {
+      "actions": [
+        {
+          "title": "整理桌面文件",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s039": {
+      "actions": [
+        {
+          "title": "预约牙医",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s040": {
+      "actions": [
+        {
+          "title": "跟张总开会",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T15:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "买牛奶",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T15:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s041": {
+      "actions": [
+        {
+          "title": "跟李工对齐",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T10:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "面试",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T14:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "跟朋友吃饭",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T19:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s042": {
+      "actions": [
+        {
+          "title": "把合同发给张总",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-06"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "订会议室",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-06"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s043": {
+      "actions": [
+        {
+          "title": "交水电费",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-02"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "给物业打电话",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-02"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s044": {
+      "actions": [
+        {
+          "title": "买牛奶",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "给妈妈打电话",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "取快递",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s045": {
+      "actions": [
+        {
+          "title": "写方案",
+          "time": {
+            "kind": "range",
+            "start": "2026-11-02T14:00:00+08:00",
+            "end": "2026-11-02T16:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "跟朋友吃饭",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T19:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s046": {
+      "actions": [
+        {
+          "title": "交周报",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-02"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 1,
+            "weekdays": [
+              1
+            ]
+          },
+          "count": null
+        },
+        {
+          "title": "开部门会",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-04"
+          },
+          "repeat": {
+            "freq": "week",
+            "interval": 1,
+            "weekdays": [
+              3
+            ]
+          },
+          "count": null
+        }
+      ]
+    },
+    "s047": {
+      "actions": [
+        {
+          "title": "取快递",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-01T18:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        },
+        {
+          "title": "还书",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-01T19:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s048": {
+      "actions": [
+        {
+          "title": "给妈妈打电话",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s049": {
+      "actions": [
+        {
+          "title": "写完报告",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s050": {
+      "actions": [
+        {
+          "title": "回复客户邮件",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s051": {
+      "actions": [
+        {
+          "title": "开会",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s052": {
+      "actions": [
+        {
+          "title": "约张总吃饭",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s053": {
+      "actions": [
+        {
+          "title": "跟张总开会",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T15:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s054": {
+      "actions": [
+        {
+          "title": "买牛奶",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s055": {
+      "actions": [
+        {
+          "title": "面试",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T14:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s056": {
+      "actions": [
+        {
+          "title": "给王工回电话",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s057": {
+      "actions": [
+        {
+          "title": "开会",
+          "time": {
+            "kind": "datetime",
+            "start": "2026-11-02T15:00:00+08:00"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s058": {
+      "actions": [
+        {
+          "title": "喝水",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": {
+            "target": 3,
+            "period": "day"
+          }
+        }
+      ]
+    },
+    "s059": {
+      "actions": [
+        {
+          "title": "交账单",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s060": {
+      "actions": [
+        {
+          "title": "看电影",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s061": {
+      "actions": [
+        {
+          "title": "学习",
+          "time": {
+            "kind": "none"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    },
+    "s062": {
+      "actions": [
+        {
+          "title": "交材料",
+          "time": {
+            "kind": "date",
+            "date": "2026-11-02"
+          },
+          "repeat": null,
+          "count": null
+        }
+      ]
+    }
+  }
+}

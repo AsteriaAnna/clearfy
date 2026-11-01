@@ -1,0 +1,421 @@
+{
+  "version": "1.0",
+  "contract_version": "1.0",
+  "anchor": {
+    "now": "2026-11-01T16:30:00+08:00",
+    "timezone": "Asia/Shanghai"
+  },
+  "description": "Clarify AI 解析评估集：62 条中文口语；每条例子的期望输出见 expected.json。",
+  "categories": {
+    "single_datetime": {
+      "zh": "单次时点",
+      "count": 10
+    },
+    "single_range": {
+      "zh": "单次时段（含时段+截止）",
+      "count": 8
+    },
+    "recurrence": {
+      "zh": "周期重复",
+      "count": 8
+    },
+    "count": {
+      "zh": "计数目标",
+      "count": 6
+    },
+    "no_time": {
+      "zh": "无时间/想法",
+      "count": 7
+    },
+    "multi_action": {
+      "zh": "多动作拆分与时间继承",
+      "count": 8
+    },
+    "vague_time": {
+      "zh": "模糊时间（不解析）",
+      "count": 5
+    },
+    "speech_slip": {
+      "zh": "口误/口水词",
+      "count": 4
+    },
+    "adversarial": {
+      "zh": "对抗/不支持表达",
+      "count": 6
+    }
+  },
+  "sentences": [
+    {
+      "id": "s001",
+      "text": "明天下午三点跟张总开会",
+      "category": "single_datetime",
+      "note": "相对日 + 下午时刻，最常用形态"
+    },
+    {
+      "id": "s002",
+      "text": "后天中午十二点跟客户吃饭",
+      "category": "single_datetime",
+      "note": "后天 + 中午十二点，整点"
+    },
+    {
+      "id": "s003",
+      "text": "周五上午十点交周报",
+      "category": "single_datetime",
+      "note": "星期名取 now 之后最近的周五（2026-11-06）"
+    },
+    {
+      "id": "s004",
+      "text": "今天下午六点半去健身房",
+      "category": "single_datetime",
+      "note": "今天 + 半点"
+    },
+    {
+      "id": "s005",
+      "text": "11月5号上午九点体检",
+      "category": "single_datetime",
+      "note": "绝对日期 月/日（同年）"
+    },
+    {
+      "id": "s006",
+      "text": "下周三下午两点面试",
+      "category": "single_datetime",
+      "note": "下周 N 按 ISO 周计算（次日为周一，故下周周三=11-04）"
+    },
+    {
+      "id": "s007",
+      "text": "三小时后提醒我喝水",
+      "category": "single_datetime",
+      "note": "相对偏移；提醒词不进标题、不产生提醒字段"
+    },
+    {
+      "id": "s008",
+      "text": "半小时后给快递打电话",
+      "category": "single_datetime",
+      "note": "相对偏移 30 分钟"
+    },
+    {
+      "id": "s009",
+      "text": "明天早上七点二十跑步",
+      "category": "single_datetime",
+      "note": "早上 + 非整点分钟"
+    },
+    {
+      "id": "s010",
+      "text": "12月1号下午三点开季度会",
+      "category": "single_datetime",
+      "note": "跨月绝对日期"
+    },
+    {
+      "id": "s011",
+      "text": "明天下午两点到四点写方案",
+      "category": "single_range",
+      "note": "时段：开始-结束，同一本地日"
+    },
+    {
+      "id": "s012",
+      "text": "周三上午九点到十一点开评审会",
+      "category": "single_range",
+      "note": "星期名 + 时段（11-04）"
+    },
+    {
+      "id": "s013",
+      "text": "今天下午五点到七点整理房间",
+      "category": "single_range",
+      "note": "当天时段且在未来"
+    },
+    {
+      "id": "s014",
+      "text": "明天下午两点到三点半跟设计对需求",
+      "category": "single_range",
+      "note": "结束时刻带半小时"
+    },
+    {
+      "id": "s015",
+      "text": "周六下午一点到五点搬家",
+      "category": "single_range",
+      "note": "周六=11-07，长时段"
+    },
+    {
+      "id": "s016",
+      "text": "11月8号上午十点到十二点陪孩子上课",
+      "category": "single_range",
+      "note": "绝对日期时段；结束只给整点"
+    },
+    {
+      "id": "s017",
+      "text": "明天下午两点到四点布置会场，最晚五点前弄完",
+      "category": "single_range",
+      "note": "时段 + 截止：deadline 仅在 range 上出现，单动作"
+    },
+    {
+      "id": "s018",
+      "text": "明天上午十点半到十一点半开一对一",
+      "category": "single_range",
+      "note": "半小时边界时段"
+    },
+    {
+      "id": "s019",
+      "text": "每天下午三点喝咖啡",
+      "category": "recurrence",
+      "note": "每天 + 时刻；当前 occurrence=下一次发生（今天15:00已过→明天）"
+    },
+    {
+      "id": "s020",
+      "text": "每天早上七点跑步",
+      "category": "recurrence",
+      "note": "每天 + 早上时刻（已过→明天）"
+    },
+    {
+      "id": "s021",
+      "text": "每周一上午九点半开周会",
+      "category": "recurrence",
+      "note": "明确星期几→weekdays=[1]；下一次为 11-02 周一"
+    },
+    {
+      "id": "s022",
+      "text": "每周一三五晚上八点健身",
+      "category": "recurrence",
+      "note": "多星期几→weekdays 升序；当前 occurrence=11-02 周一 20:00"
+    },
+    {
+      "id": "s023",
+      "text": "每两周周三下午两点做复盘",
+      "category": "recurrence",
+      "note": "间隔 2 周 + 明确周三→weekdays=[3]；首次=11-04"
+    },
+    {
+      "id": "s024",
+      "text": "每月15号上午十点交房租",
+      "category": "recurrence",
+      "note": "每月同日；当前 occurrence=11-15"
+    },
+    {
+      "id": "s025",
+      "text": "每周六下午陪家人",
+      "category": "recurrence",
+      "note": "只有星期几、无明确时刻→日期型（date）重复；当前 occurrence=11-07"
+    },
+    {
+      "id": "s026",
+      "text": "每周二和周四下午四点倒垃圾",
+      "category": "recurrence",
+      "note": "两个星期几→[2,4]；下一次=11-03 周二"
+    },
+    {
+      "id": "s027",
+      "text": "每天三杯水",
+      "category": "count",
+      "note": "计数目标 3/天；标题去掉数量与时间"
+    },
+    {
+      "id": "s028",
+      "text": "每周三次健身房",
+      "category": "count",
+      "note": "计数目标 3/周"
+    },
+    {
+      "id": "s029",
+      "text": "今天喝八杯水",
+      "category": "count",
+      "note": "“今天”与 day 周期一致，归入 count.period=day"
+    },
+    {
+      "id": "s030",
+      "text": "每天背五十个单词",
+      "category": "count",
+      "note": "中文数字数量→50/天"
+    },
+    {
+      "id": "s031",
+      "text": "每周读完两本书",
+      "category": "count",
+      "note": "周期数量 2/周"
+    },
+    {
+      "id": "s032",
+      "text": "每天做三十个俯卧撑",
+      "category": "count",
+      "note": "数量 30/天"
+    },
+    {
+      "id": "s033",
+      "text": "买牛奶",
+      "category": "no_time",
+      "note": "无任何时间线索→time.kind=none"
+    },
+    {
+      "id": "s034",
+      "text": "给妈妈打个电话",
+      "category": "no_time",
+      "note": "无时间线索"
+    },
+    {
+      "id": "s035",
+      "text": "记得回复王工邮件",
+      "category": "no_time",
+      "note": "“记得”是语气词，不进标题"
+    },
+    {
+      "id": "s036",
+      "text": "想学钓鱼",
+      "category": "no_time",
+      "note": "想法型，无时间"
+    },
+    {
+      "id": "s037",
+      "text": "把发票报销了",
+      "category": "no_time",
+      "note": "“把”字句改写为动宾短语"
+    },
+    {
+      "id": "s038",
+      "text": "整理一下桌面文件",
+      "category": "no_time",
+      "note": "“一下”不进标题"
+    },
+    {
+      "id": "s039",
+      "text": "预约牙医",
+      "category": "no_time",
+      "note": "无时间线索"
+    },
+    {
+      "id": "s040",
+      "text": "明天下午三点跟张总开会，还要买牛奶",
+      "category": "multi_action",
+      "note": "拆 2 条；共用明确时间被继承"
+    },
+    {
+      "id": "s041",
+      "text": "明天上午十点跟李工对齐，下午两点面试，晚上七点跟朋友吃饭",
+      "category": "multi_action",
+      "note": "拆 3 条；日期“明天”只出现一次，后续分句继承"
+    },
+    {
+      "id": "s042",
+      "text": "周五前把合同发给张总，顺便订会议室",
+      "category": "multi_action",
+      "note": "拆 2 条；“X 前”解析为日期 X 当天（截止日）；共用日期继承"
+    },
+    {
+      "id": "s043",
+      "text": "明天记得交水电费，还有给物业打电话",
+      "category": "multi_action",
+      "note": "拆 2 条；共用日期“明天”继承"
+    },
+    {
+      "id": "s044",
+      "text": "买牛奶，然后给妈妈打电话，再取快递",
+      "category": "multi_action",
+      "note": "拆 3 条，全部无时间"
+    },
+    {
+      "id": "s045",
+      "text": "明天下午两点到四点写方案，晚上七点跟朋友吃饭",
+      "category": "multi_action",
+      "note": "拆 2 条：range + datetime；日期继承"
+    },
+    {
+      "id": "s046",
+      "text": "每周一交周报，每周三开部门会",
+      "category": "multi_action",
+      "note": "拆 2 条周期任务：只有星期几→日期型重复；各自有明确星期基础"
+    },
+    {
+      "id": "s047",
+      "text": "今天下午六点取快递，晚上七点还书",
+      "category": "multi_action",
+      "note": "拆 2 条，同一天两个时点"
+    },
+    {
+      "id": "s048",
+      "text": "晚上给妈妈打电话",
+      "category": "vague_time",
+      "note": "只有“晚上”→模糊不解析"
+    },
+    {
+      "id": "s049",
+      "text": "上午把报告写完",
+      "category": "vague_time",
+      "note": "只有“上午”→模糊不解析"
+    },
+    {
+      "id": "s050",
+      "text": "尽快回复客户邮件",
+      "category": "vague_time",
+      "note": "“尽快”不是明确时间"
+    },
+    {
+      "id": "s051",
+      "text": "下午开会",
+      "category": "vague_time",
+      "note": "只有“下午”→模糊不解析"
+    },
+    {
+      "id": "s052",
+      "text": "改天约张总吃饭",
+      "category": "vague_time",
+      "note": "“改天”不是明确日期"
+    },
+    {
+      "id": "s053",
+      "text": "呃那个，明天下午三点跟张总开会啊",
+      "category": "speech_slip",
+      "note": "口水词不进标题；时间照常解析"
+    },
+    {
+      "id": "s054",
+      "text": "就是那个，帮我买一下牛奶吧",
+      "category": "speech_slip",
+      "note": "口水词与语气词剔除"
+    },
+    {
+      "id": "s055",
+      "text": "明天，明天下午两点面试",
+      "category": "speech_slip",
+      "note": "重复口误合并为一条，不拆成两条"
+    },
+    {
+      "id": "s056",
+      "text": "那个啥来着，给王工回个电话",
+      "category": "speech_slip",
+      "note": "无意义填充词剔除"
+    },
+    {
+      "id": "s057",
+      "text": "提醒我明天下午三点开会",
+      "category": "adversarial",
+      "note": "“提醒我”不产生提醒字段、不进标题；明确时间照常解析"
+    },
+    {
+      "id": "s058",
+      "text": "每天早中晚各喝一杯水",
+      "category": "adversarial",
+      "note": "“各一次”=明确 3 次/天，计数型；早中晚不是明确时刻"
+    },
+    {
+      "id": "s059",
+      "text": "这个月的账单记得交",
+      "category": "adversarial",
+      "note": "“这个月”非明确日期→不解析；不得编造日期"
+    },
+    {
+      "id": "s060",
+      "text": "每个月看四部电影",
+      "category": "adversarial",
+      "note": "计数周期只支持 day/week；“每月”计数不受支持→不解析 count，也不得编造时间"
+    },
+    {
+      "id": "s061",
+      "text": "每天学习",
+      "category": "adversarial",
+      "note": "只有“每天”频率、没有任何明确时间基准→不解析重复，时间保持 none"
+    },
+    {
+      "id": "s062",
+      "text": "明天两点交材料",
+      "category": "adversarial",
+      "note": "只有“两点”无上下午（可为 02:00/14:00）→ 只解析日期，不解析时刻"
+    }
+  ]
+}

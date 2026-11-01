@@ -1,34 +1,44 @@
 # Clarify
 
-无需部署服务器的极简 AI 待办软件（Windows 桌面，设计中）。
+无需部署服务器的极简 AI 待办软件（Windows 桌面，开发前准备中）。
 
 > 说一句就安排好，点一下就完成，24 小时后消失。
 
 ## 当前状态
 
-- **阶段**：产品定义第一轮讨论完成（2026-11-01）；开发前文档的写手暂未启动，等产品定义逐项确认后再写
-- **最新权威记录**：[docs/00-product-decisions.md](docs/00-product-decisions.md)（产品定义讨论 v1.0）
-- **核心澄清**：没有收件箱/标签/多状态；只有"未完成/已完成"；完成的 24h 内可恢复、之后物理删除；事件 = 动作标题 + 可选字段（时间/重复/计数）；显示模板 A 时间轴 / B 清单，可切换
-- **下一步**：继续逐项讨论 §10 待定清单（先视觉细化 / 到时通知 / 数据备份），然后写 PRD、交互、领域模型与契约，再进入技术尖峰
+- **阶段**：开发前文档初稿完成（PRD / 交互 / 领域 / 架构 / 契约 / 测试 / 路线 / 发布 / 评估集 / ADR）；红队审查与视觉初稿进行中
+- **最新权威记录**：[docs/00-product-decisions.md](docs/00-product-decisions.md)（产品定义 v1.1）
+- **核心定义**：无收件箱/标签/通知/首启引导/备份导出；只有"未完成/已完成"；完成 24h 内可恢复、之后物理删除；事件 = 动作标题 + 可选字段（时间/重复/计数）；显示模板 A 时间轴 / B 清单；主窗 = 一个主页面 + 设置
+- **下一步**：红队审查修一致性 → 视觉初稿交你调整 → 开始开发后端与底层（M1）
 
 ## 文档索引
 
 | 文件 | 内容 |
 |---|---|
-| [docs/00-product-decisions.md](docs/00-product-decisions.md) | **产品定义讨论记录 v1.0（当前权威）** |
-| [docs/00-charter.md](docs/00-charter.md) | 项目宪章/术语表（v1.0，部分条款已被产品决策更新，待 v1.1） |
-| [docs/10-risks-decisions.md](docs/10-risks-decisions.md) | 决策登记与风险登记（D/R 系列） |
-| [docs/design-v0.3.md](docs/design-v0.3.md) | 历史设计稿（AI 架构已更正，产品定义以 00-product-decisions 为准） |
-| [docs/design-v0.2.md](docs/design-v0.2.md) / [v0.1](docs/design-v0.1.md) | 历史版本 |
-| [docs/prototype-v0.1.html](docs/prototype-v0.1.html) | 旧可点击线框（已过时：仍含收件箱/标签/多状态，待按新定义重做） |
-| [docs/research/tech-stack.md](docs/research/tech-stack.md) | 技术选型研究（桌面壳/本机 ASR 部分有效） |
-| [docs/research/product-ux.md](docs/research/product-ux.md) | 产品交互研究（部分被新决策取代） |
-| [docs/adr/0001-ai-service-model.md](docs/adr/0001-ai-service-model.md) | ADR-0001 草案：AI 能力提供方式 |
-| [docs/ops/official-ai-gateway-setup.md](docs/ops/official-ai-gateway-setup.md) | 官方 AI 服务注册/部署指南 |
+| [00-product-decisions.md](docs/00-product-decisions.md) | **产品定义讨论记录 v1.1（当前权威）** |
+| [00-charter.md](docs/00-charter.md) | 项目宪章/术语表（v1.0；§2/§6/§8 部分条款以产品决策为准） |
+| [01-prd.md](docs/01-prd.md) | PRD：F1~F12 功能、验收标准、指标、开放问题 |
+| [02-ux-spec.md](docs/02-ux-spec.md) | 交互规范：页面地图、A/B 模板、状态矩阵、文案、快捷键 |
+| [03-domain-model.md](docs/03-domain-model.md) | 领域模型：字段字典、两状态、重复/计数、用例、非法组合 |
+| [04-architecture.md](docs/04-architecture.md) | 技术架构：进程/模块/数据流/性能预算/降级矩阵 |
+| [05-contracts/](docs/05-contracts/) | 契约：AI JSON、网关 API、Tauri IPC、存储 schema、配置 schema、错误码 |
+| [06-adr/](docs/06-adr/) | ADR-0001~0008（AI 服务/供应商/壳/数据删除/模板/密钥隐私/更新/视觉） |
+| [07-test-strategy.md](docs/07-test-strategy.md) | 测试策略、AI 门禁、E2E、Go/No-Go |
+| [08-engineering.md](docs/08-engineering.md) | 工程规范：仓库/工具链/脚本/CI/秘密管理 |
+| [09-roadmap-wbs.md](docs/09-roadmap-wbs.md) | M0~M4 路线、WBS、依赖、DoD |
+| [10-risks-decisions.md](docs/10-risks-decisions.md) | 决策登记（D 系列）与风险登记（R 系列） |
+| [11-release-ops.md](docs/11-release-ops.md) | 发布/签名/更新/隐私/许可/运营 |
+| [eval/](docs/eval/) | 62 条中文口语评估集 + 期望 JSON + 指标规范 |
+| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.2.html](docs/prototype-v0.2.html) | 视觉初稿（进行中） |
+| [docs/handover/](docs/handover/) | 红队审查报告、交接手册（进行中） |
+| [research/](docs/research/) | 早期技术/产品研究（历史证据） |
+| [design-v0.1~v0.3](docs/design-v0.3.md) | 历史设计稿（已被产品决策取代） |
+| [prototype-v0.1.html](docs/prototype-v0.1.html) | 旧线框（已过时，待删/替换为 v0.2） |
+| [ops/official-ai-gateway-setup.md](docs/ops/official-ai-gateway-setup.md) | 官方 AI 服务注册/部署指南 |
 
 ## 产品一句话
 
-想到一件事 → 全局快捷键说一句 → 本机转写 + 云端 AI 理解成"动作 + 字段" → 直接落到视图（无缓冲区）；点一下完成；已完成 24h 内可见可恢复、之后物理删除；悬浮窗是可移动可缩放的精致小组件。
+想到一件事 → 全局快捷键说一句 → 云端语音识别 + DeepSeek 理解成"动作 + 字段" → 直接落到视图（无缓冲区）；点一下完成；已完成 24h 内可见可恢复、之后物理删除；悬浮窗是可移动可缩放的精致小组件。
 
 ## 技术方向（待 spike 验证）
 
