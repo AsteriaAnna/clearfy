@@ -1,13 +1,13 @@
 # 存储契约（SQLite Schema）
 
 - 文档 Owner：领域与契约写手（W2）
-- 版本：v1.0（2026-11-01，初稿，待红队审查）
+- 版本：v1.1（2026-11-01，初稿 + 按用户确认口径修订，待红队审查）
 - 状态：开发前基线；表、列、约束、索引、迁移、清理**以本文为准**
-- 上游权威：`docs/00-product-decisions.md` v1.1（无服务器 / 数据只在本机 / 24h 物理删除 / 不做备份导出）
+- 上游权威：`docs/00-product-decisions.md` v1.2（唯一权威；无服务器 / 数据只在本机 / 24h 物理删除 / 不做备份导出 / 计数允许超额不折叠）
 - 字段语义：`docs/03-domain-model.md` §2（**字段名逐字一致**）；AI 落库映射：`docs/05-contracts/ai-json.md` 附录 B
 - 技术前提：Tauri 2 + Rust + `rusqlite`（SQLite ≥ 3.38，需 JSON1，bundled 版本默认满足）+ WAL
 
-> 设计原则：**只存产品定义里明确存在的数据**。没有原文、没有置信度、没有标签、没有提醒、没有软删除标记、没有备份表。24 小时后物理删除后不可找回（产品决策 v1.1 §7/D14）。
+> 设计原则：**只存产品定义里明确存在的数据**。没有原文、没有置信度、没有标签、没有提醒、没有软删除标记、没有备份表。24 小时后物理删除后不可找回（产品决策 v1.2 §7/D14）。
 
 ---
 
@@ -17,7 +17,7 @@
 |---|---|
 | ❌ 备份 / 导出 / 导入 | `D14` 已推翻：不生成 `.bak`、不导出 JSON/Markdown、不提供恢复 API（见 §11） |
 | ❌ 回收站 / 软删除 / 归档标记 | 只有未完成/已完成；已完成 24h 后 `DELETE`；删除不可恢复 |
-| ❌ 原始语音/转写原文 / 解析置信度 / AI 假设 / batch_id | 产品决策 v1.1：除标题与字段外不引入其它字段；原文留存仍待定（`00-product-decisions.md` §10-5） |
+| ❌ 原始语音/转写原文 / 解析置信度 / AI 假设 / batch_id | 产品决策 v1.2：除标题与字段外不引入其它字段；**原文不落库、不支持"重新解析"**（Q10 已确认） |
 | ❌ 标签 / 清单 / 优先级 / 备注 / 提醒时间 | v1 无这些字段 |
 | ❌ 密钥 / 激活码明文 | Key 存 Windows 凭据管理器（DPAPI），DB 不存（见 04-architecture） |
 | ❌ 遥测 / 账号 / 设备 ID / 同步字段 | 无服务器、单机；不预留 `device_id`/`deleted_at`/`updated_at` |
@@ -119,6 +119,7 @@ CREATE TABLE events (
                                            AND json_type(repeat_weekdays) = 'array')),
     count_target        INTEGER CHECK (count_target IS NULL OR count_target BETWEEN 1 AND 99999),
     count_period        TEXT    CHECK (count_period IS NULL OR count_period IN ('day', 'week')),
+    -- 计数进度允许超过 target（如 4/3）：目标只是显示参照，不设上限
     count_progress      INTEGER NOT NULL DEFAULT 0
                                 CHECK (count_progress >= 0),
     count_period_key    TEXT    CHECK (count_period_key IS NULL
@@ -145,7 +146,6 @@ CREATE TABLE events (
 
     CHECK (count_target IS NOT NULL OR (count_period IS NULL AND count_period_key IS NULL AND count_progress = 0)),
     CHECK (count_target IS NULL OR (count_period IS NOT NULL AND count_period_key IS NOT NULL)),
-    CHECK (count_target IS NULL OR count_progress <= count_target),
     CHECK (count_target IS NULL
            OR (due_date IS NULL AND due_start_at IS NULL AND due_end_at IS NULL AND deadline_at IS NULL)),
     CHECK (count_target IS NULL OR repeat_freq IS NULL),
@@ -251,9 +251,9 @@ COMMIT;
 | `repeat_freq` | TEXT | `day`/`week`/`month`；要求有时间基准 | 重复频率 |
 | `repeat_interval` | INTEGER | 1–99；无频率时必须 NULL | 间隔 |
 | `repeat_weekdays` | TEXT | JSON 数组（`json_valid`）；仅 `week` 允许 | 规范化 `[1,3,5]` |
-| `count_target` | INTEGER | 1–99999；与时间/重复互斥 | 计数目标 |
+| `count_target` | INTEGER | 1–99999；与时间/重复互斥；目标仅作显示参照（`progress` 可超过它） | 计数目标 |
 | `count_period` | TEXT | `day`/`week`；与 target 同生同灭 | 计数周期 |
-| `count_progress` | INTEGER | 非空默认 0；`<= target`；无 target 时=0 | 本周期进度 |
+| `count_progress` | INTEGER | 非空默认 0；`>= 0`；**允许超过 `count_target`（如 4/3），不设上限**；无 target 时=0 | 本周期进度 |
 | `count_period_key` | TEXT | 日键或 ISO 周键；与 target 同生同灭 | 周期标识 |
 | `created_at` | TEXT | 非空、UTC、日历合法 | 创建时间 |
 | `completed_at` | TEXT | UTC、日历合法、`>= created_at`；仅单次/无时间型 | 完成时间 |
@@ -276,7 +276,7 @@ COMMIT;
 - 一条日志 = 周期系列"这一次"的完成记录；不存 title（标题以事件行为准）。
 - 快照列组合必须符合领域文档的时间精度规则（date / datetime / range 三选一，实测已覆盖）。
 - 日志**24 小时后物理删除**；不保留历史（无导出、无统计）。
-- 只有周期型会写日志；单次型用 `events.completed_at`，计数型不写日志（派生）。
+- 只有周期型会写日志；单次型用 `events.completed_at`；计数型**没有完成态**，不写日志、不写 `completed_at`。
 
 ### 5.3 `settings`：键值配置（只存非敏感、非内容数据）
 
@@ -331,7 +331,7 @@ COMMIT;
 | 完成单次/无时间型 | `UPDATE events SET completed_at=:now WHERE id=:id AND completed_at IS NULL AND repeat_freq IS NULL AND count_target IS NULL;` `changes()=0` → 幂等成功（已完成）或 404（不存在） |
 | 完成周期型 | 1) 读事件并快照 occurrence；2) `INSERT event_completions`；3) `UPDATE events` 为下一次 occurrence。三步同一事务原子提交 |
 | 恢复周期型 | 1) `SELECT ... WHERE event_id=:id ORDER BY completed_at DESC, id DESC LIMIT 1`；2) 最新日志 ≠ 目标 → 409；3) `DELETE` 该日志；4) `UPDATE events` 回快照。同一事务 |
-| 计数 +1 | 1) 读计数事件；2) 若 `count_period_key <> 当前键` → 先重置为 0/当前键；3) `progress = min(progress+1, target)`；4) 写回。同一事务（读-改-写串行化） |
+| 计数 +1 | 1) 读计数事件；2) 若 `count_period_key <> 当前键` → 先复位为 0/当前键；3) `progress = progress + 1`（**不封顶，可超过 target**）；4) 写回。同一事务（读-改-写串行化） |
 | 删除 | `DELETE FROM events WHERE id=:id`（日志随 FK 级联）；周期型"只删本次"不执行 DELETE，而是推进 occurrence（同完成周期型但不写日志） |
 | 清理作业 | 见 §9，单事务多语句；幂等 |
 | 迁移 | 每个迁移文件一个事务；失败整体回滚 |
@@ -343,12 +343,12 @@ COMMIT;
 
 ## 8. 显示/读取不变量
 
-- 读"未完成"一律 `WHERE completed_at IS NULL`（计数型的完成由 `progress/target + 当前周期键` 派生，不查 `completed_at`）。
+- 读"未完成"一律 `WHERE completed_at IS NULL`；计数型**没有完成态**（`completed_at` 恒为 NULL），读路径只按当前周期键判定进度是否过期。
 - 读"已完成折叠"：
   - 单次/无时间型：`completed_at > cutoff(now-24h)`；
   - 周期型：`event_completions.completed_at > cutoff`（join 事件取标题）；
-  - 计数型：`count_progress >= count_target AND count_period_key = 当前键`。
-- 计数型在**读路径**也要按当前周期键判定：若 `count_period_key` 已过期，即使清理作业还没跑，也按"未完成、进度 0"展示；写路径（+1）先做懒重置。
+  - 计数型：**不进入折叠**（即使 `progress >= target` 也不查、不展示为已完成）。
+- 计数型在**读路径**也要按当前周期键判定：若 `count_period_key` 已过期，即使清理作业还没跑，也按"进度 0"展示（旧周期进度视为过期）；写路径（+1）先做懒复位。
 - 所有视图只读不写；不得在读路径自动"顺手清理"（清理只由 §9 作业执行），避免读操作放大写锁。
 
 ---
@@ -381,7 +381,7 @@ DELETE FROM events
  WHERE completed_at IS NOT NULL
    AND completed_at <= :cutoff_utc;
 
--- 3) 计数周期重置（日）
+-- 3) 计数周期复位（日）——只复位进度，不删除计数事件
 UPDATE events
    SET count_progress = 0,
        count_period_key = :day_key
@@ -389,7 +389,7 @@ UPDATE events
    AND count_period = 'day'
    AND count_period_key <> :day_key;
 
--- 4) 计数周期重置（周）
+-- 4) 计数周期复位（周）——只复位进度，不删除计数事件
 UPDATE events
    SET count_progress = 0,
        count_period_key = :week_key
@@ -411,15 +411,16 @@ COMMIT;
 
 - **只删**：完成的单次/无时间型事件行、超过 24h 的周期完成日志。
 - **绝不删**：周期事件行、计数事件行、未完成事项、设置、迁移记录。
+- **计数型无 24h 删除**：没有完成态/完成日志，达标或超额都不删除、不进折叠；仅在周期边界复位 `count_progress`。
 - 幂等：重复执行结果一致；删除 0 行也视为成功并更新时间戳。
 - 失败：回滚，本轮放弃；下轮重试；错误日志只含错误类型与行数，不含内容。连续失败在 UI 中弱提示（如"清理失败，稍后重试"），不阻塞用户操作。
 - 与界面同一阈值：`completed_at + 24h`；界面隐藏即数据已/将删除，不存在"隐藏但保留"的软删除。
 
 ### 9.4 物理删除不可恢复
 
-- 无回收站、无撤销、无备份、无导出（产品决策 v1.1 §7；D14 已推翻）。
+- 无回收站、无撤销、无备份、无导出（产品决策 v1.2 §7；D14 已推翻）。
 - 用户主动删除（详情抽屉）立即 `DELETE`，同样不可恢复。
-- 数据库文件损坏/被误删 → 数据丢失，无兜底（风险 R6，已在 `10-risks-decisions.md` 接受；v1.1 明确不做备份）。
+- 数据库文件损坏/被误删 → 数据丢失，无兜底（风险 R6，已在 `10-risks-decisions.md` 接受；v1.2 明确不做备份）。
 
 ---
 
@@ -442,7 +443,7 @@ COMMIT;
 - 本契约不定义任何备份/导出/导入/恢复 API、表、文件或脚本；应用不得在磁盘上生成数据库副本（`.bak`/快照/导出 JSON）。
 - 迁移前不创建备份；迁移失败靠"事务回滚 + 拒绝启动"保证一致性，而不是副本。
 - 数据安全的唯一保障：本机 SQLite 文件自身 + 用户自行管理的系统级备份（应用不感知、不承诺）。
-- 该决定的后果由 `00-product-decisions.md` v1.1 与 `10-risks-decisions.md`（D14/R6）承担；本文只保证实现不偷偷提供软删除/回收站。
+- 该决定的后果由 `00-product-decisions.md` v1.2 与 `10-risks-decisions.md`（D14/R6）承担；本文只保证实现不偷偷提供软删除/回收站。
 
 ---
 
@@ -486,7 +487,7 @@ VALUES ('00000000-0000-7000-8000-000000000004', '买牛奶', '2026-11-01T08:30:0
 ## 14. 迁移与清理测试要求（验收）
 
 1. **基线建库**：空目录首次启动 → `user_version=1`、6 个索引存在、`schema_migrations` 有 1 行。
-2. **约束矩阵**：至少覆盖领域文档 §13.1 全部 C 编号（每类非法写入必须抛 `IntegrityError`，合法写入必须成功）；`events` 与 `event_completions` 的时间组合均测。
+2. **约束矩阵**：至少覆盖领域文档 §13.1 全部 C 编号（每类非法写入必须抛 `IntegrityError`，合法写入必须成功）；`events` 与 `event_completions` 的时间组合均测；**`count_progress > count_target`（如 4/3）必须写入成功**。
 3. **级联**：删除周期事件 → 完成日志全部消失；删除单次事件 → 无残留。
 4. **清理**：造 `completed_at = now-24h±1s` 的单次事件与日志，验证删除边界；计数跨日/跨周重置；重复执行幂等。
 5. **恢复**：最新日志恢复成功、非最新日志拒绝（409 语义）、超 24h 拒绝。
@@ -513,3 +514,4 @@ VALUES ('00000000-0000-7000-8000-000000000004', '买牛奶', '2026-11-01T08:30:0
 | 版本 | 日期 | 变更 | 来源 |
 |---|---|---|---|
 | v1.0 | 2026-11-01 | 首版：events / event_completions / settings / schema_migrations；WAL；约束与索引；24h 物理清理；计数周期重置；无备份导出；schema 版本 1 | `00-product-decisions.md` v1.1 + `03-domain-model.md` |
+| v1.1 | 2026-11-01 | 计数语义：允许 `count_progress > count_target`（移除上限 CHECK）、`+1` 不封顶；明确计数无完成态/无 24h 删除，清理 SQL 仅复位 | 用户确认（经 Lead） |

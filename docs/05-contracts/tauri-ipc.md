@@ -1,9 +1,9 @@
 # Tauri IPC 契约（tauri-ipc）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.2（红队修复稿；v0.1 初稿）
+- 版本：v0.3（计数语义用户确认稿；v0.2 红队修复稿）
 - 更新日期：2026-11-01
-- 本次修订（v0.2）：P0-03 新增 `maintenance.run`（仅 debug 注册、能力白名单仅 main）与额度重置权威说明；P1-05 客户端只展示网关 `X-Quota-Reset-At`；P2-02 补 `capture_id`↔`batch_id` 映射。修订章节：§0、§1.4、§3、§4.5、§4.16、§4.18、§6、§9、§12。
+- 本次修订（v0.3，用户确认 2026-11-01）：计数语义同步——`+1` **不封顶**（`count_progress` 可大于 `count_target`，如 4/3）、计数**无完成态**（不写 `completed_at`、不进"已完成"折叠、无 24 h 删除、无"恢复"）、仅周期边界复位；`ViewResult.completed` 移除 `counts`；命令名按 Lead 口径统一为 `event.increment_count`（原 `event.count_increment`）。修订章节：§1.1、§1.3、§3、§4.10、§4.11、§4.12、§5、§9、§12。
 - 状态：**v1 冻结候选**。领域字段与语义的**唯一事实源是 `03-domain-model.md`**；错误码见 `05-contracts/error-taxonomy.md`；设置结构见 `05-contracts/config-schema.md`；AI 输出见 `05-contracts/ai-json.md`；网关 HTTP 见 `05-contracts/gateway-api.md`。
 - 关联：`04-architecture.md` §3/§4/§5
 
@@ -59,12 +59,13 @@
 |---|---|---|
 | `time_kind` | `none` \| `date` \| `datetime` \| `range` | domain §2.1 |
 | `shape` | `single` \| `recurring` \| `count` \| `untimed` | domain §3 |
-| `status` | `open` \| `done` | domain §3（周期型事件行恒为 `open`） |
+| `status` | `open` \| `done` | domain §3（周期型事件行恒为 `open`；**计数型恒为 `open`**——无完成态） |
 | `is_overdue` | bool | domain §11.2 |
 | `expires_at` | UTC ISO \| null | domain §3（单次/无时间型 completed+24h；周期完成日志各自计算；计数型为 null） |
 | `current_period_key` | string \| null | domain §8.3（仅计数型） |
 
 - 写入类命令**不接受**派生字段（传了忽略并记日志，不报错）。
+- **计数型（用户确认 2026-11-01）**：`count_progress` 允许大于 `count_target`（如 4/3，目标仅作显示参照）；`status` 恒为 `open`、`expires_at` 恒为 `null`；不写 `completed_at`、不产生完成日志、不进"已完成"折叠、无 24 h 删除，仅周期边界（日/周）复位。
 - `repeat_interval` 缺失时后端归一为 1（domain §13.1 C11，storage-schema 归一化规则）。
 - `repeat_weekdays`：IPC 用数组（`number[] | null`），存储层为规范化 JSON 文本（storage-schema §5.1）；Rust DTO 负责双向转换，前端不接触字符串形式。
 - 前端显示文案（时间文案/重复文案/倒计时）按 `03-domain-model.md` §4 实现于共享前端模块，不在 IPC 重复下发，避免多窗口不一致。
@@ -114,7 +115,6 @@ type ViewQuery =
   "completed": {
     "events": [],
     "occurrences": [],
-    "counts": [],
     "total": 0,
     "next_purge_at": "2026-11-02T15:30:00Z"
   },
@@ -127,9 +127,9 @@ type ViewQuery =
 | `time_range` | timeline（main/widget） | 生效的时间范围（来自 `settings.views.*.timeline.range`）；`list`/`month` 为 null |
 | `sections` | list | 分组：`overdue` / `today` / `later` / `untimed`；**main**：`scope=today` → `[overdue, today, untimed]`，`scope=all` → 四组全含（domain §11.1：B 今天 = 逾期+今天+无时间与打卡） |
 | `days` | timeline_day/week/month | `[{date, events}]`：day=1 天；week=连续 7 天（domain §11.1：从今天起）；month=当月每日（**仅已安排事件**，格子最多 3 条由前端按 domain 规则展示，数据不裁剪） |
-| `untimed` | timeline main | 轴下方"无时间与打卡"区（无时间型 + 未达标计数型，按 domain §11.3 排序） |
+| `untimed` | timeline main | 轴下方"无时间与打卡"区（无时间型 + **全部计数型，不论 `count_progress` 是否达到/超过 `count_target`**；按 domain §11.3 排序；计数显示 `progress/target · 周期`，如 4/3） |
 | `outside_range` | timeline main | 因时间范围裁选而未上轴的事件（完整事件；选区内事件已**整条**包含，不裁剪时段，见 domain/产品决策 §5） |
-| `completed` | 所有 main 视图 | `events`=单次/无时间型 24 h 内；`occurrences`=周期日志 24 h 内；`counts`=本周期达标计数型；`next_purge_at`=最早到期时间（无则 null） |
+| `completed` | 所有 main 视图 | `events`=单次/无时间型 24 h 内；`occurrences`=周期日志 24 h 内；`next_purge_at`=最早到期时间（无则 null）。**不含计数型**（计数无完成态、不进折叠、无 24 h 删除） |
 | `truncated` | widget | `{shown, hidden}`：悬浮窗上限 **5 条**（charter 清晰规则）。widget 不返回 `untimed`/`outside_range`/`completed`（domain §11.1 悬浮窗规则），`sections`/`days` 已裁剪 |
 
 **widget 行为**（`window: "widget"`）：`timeline_day` 返回逾期 + 今天、最多 5 条（`days=[{date:今天, events:[...]}]`，`sections=null`）；`list` 返回今日/全部前 5 条（`sections` 裁剪、`truncated` 必填）。无时间与打卡、已完成不占悬浮窗主区。
@@ -211,7 +211,7 @@ type ViewQuery =
 | | `event.delete` | `event_delete` | `op_id` | main | 永久删除 |
 | | `event.complete` | `event_complete` | `op_id` | main / widget | 完成（单次/无时间/周期本次） |
 | | `event.restore` | `event_restore` | `op_id` | main | 恢复（≤24 h / 本周期计数） |
-| | `event.count_increment` | `event_count_increment` | `op_id` | main / widget | 计数 +1 |
+| | `event.increment_count` | `event_increment_count` | `op_id` | main / widget | 计数 +1（**不封顶**；无完成态、无折叠） |
 | 视图 | `view.query` | `view_query` | 是 | main / widget | §1.3 |
 | 设置 | `settings.get` | `settings_get` | 是 | main | |
 | | `settings.update` | `settings_update` | 否 | main | 深合并 patch + 校验 + 应用副作用 |
@@ -373,7 +373,7 @@ type ViewQuery =
 
 - 单次/无时间型：写 `completed_at`（重复点击幂等，不覆盖原值）。
 - 周期型：写完成日志 + 事件推进到下一次；`completion` 返回日志，`event` 是推进后的事件。
-- 计数型：**不允许**用本命令（用 `event.count_increment`）→ `CLR-E5006`。
+- 计数型：**不允许**用本命令（用 `event.increment_count`）→ `CLR-E5006`。
 - 成功后 `emit("event.completed")`；前端 1 s 内从悬浮窗移除（乐观隐藏 + 事件确认）。
 
 ### 4.11 `event.restore`
@@ -384,21 +384,23 @@ type ViewQuery =
 
 - 单次/无时间型：`completion_id` 省略；`completed_at=NULL`。
 - 周期型：`completion_id` 必填且必须是该事件**最新**日志，否则 `CLR-E5009`；超 24 h/已清理 → `CLR-E5008`。
-- 计数型：本周期已完成时 `count_progress = max(0, target-1)`；跨周期后入口不存在 → `CLR-E5008`。
+- 计数型：**不适用恢复**（计数无完成态、不产生折叠）；调用返回 `CLR-E5006`，UI 不提供入口。
 - 返回更新后的 `Event`（周期型另回恢复的 occurrence 字段）。
 
-### 4.12 `event.count_increment`
+### 4.12 `event.increment_count`
 
-`{ "event_id": "...", "delta": 1, "op_id": "…" }`（v1 前端固定 `delta=1`）
+`{ "event_id": "...", "op_id": "…" }`（固定 +1；不接受 `delta`）
 
 返回：
 
 ```jsonc
-{ "event": { /* 更新后 */ }, "just_completed": false, "period_key": "2026-11-02" }
+{ "event": { /* 更新后 */ }, "progress": 4, "target": 3, "period_key": "2026-11-02" }
 ```
 
-- 未达标时 `count_progress+1`；达到 target → 本周期已完成（`just_completed=true`），不再增长（domain T7）。
-- 跨周期旧数据：后端先按当前周期键重置再 +1（domain T9）；`period_key` 返回当前键。
+- **不封顶**：`count_progress+1`，**允许超过 `count_target`**（如 4/3）；目标只用于显示参照。
+- **无完成态**：不写 `completed_at`、不产生完成日志、不进"已完成"折叠、**不返回任何"已完成"字段**（无 `just_completed`）；UI 只显示 `progress/target · 周期`。
+- 周期边界（`count_period=day` → 本地零点；`week` → 本地周一 00:00，经 Clock）：`count_progress=0`、`count_period_key=当前键`；**无 24 h 删除**（事件行保留）。
+- 跨周期旧数据：后端先按当前周期键复位再 +1（domain §8）；`period_key` 返回当前键。
 - `op_id` 去重防止双击 +2（本命令最需要幂等）。
 
 ### 4.13 `view.query`
@@ -466,9 +468,9 @@ type ViewQuery =
 | 事件 | payload | 时机 | 消费方 |
 |---|---|---|---|
 | `event.created` | `{event, at, revision}` | 事项创建（含 `ai.parse` 批量） | main、widget（widget 刷新今日） |
-| `event.updated` | `{event, changes: string[], at, revision}` | 编辑/完成日志推进/计数 +1/恢复 | main、widget |
+| `event.updated` | `{event, changes: string[], at, revision}` | 编辑/完成日志推进/计数 +1（changes 含 `count_progress`；**计数不发 `event.completed`**）/恢复 | main、widget |
 | `event.deleted` | `{event_id, deleted_kind:"event"|"occurrence", at, revision}` | 物理删除/周期删本次 | main、widget |
-| `event.completed` | `{event, completion: OccurrenceCompleted|null, at, revision}` | `event.complete` 成功 | main、widget |
+| `event.completed` | `{event, completion: OccurrenceCompleted|null, at, revision}` | `event.complete` 成功（**计数型不产生**，计数 +1 只发 `event.updated`） | main、widget |
 | `event.restored` | `{event, completion_id: string|null, at, revision}` | `event.restore` 成功 | main |
 | `event.purged` | `{event_ids: string[], completion_ids: string[], at, revision}` | 24 h 清理物理删除后 | main（从折叠区移除） |
 | `capture.level` | `{capture_id, level: 0-100}` | 录音中 20 Hz（前端可订阅/退订） | main |
@@ -549,7 +551,7 @@ idle
 
 | 命令/事件 | `main` | `widget` |
 |---|---|---|
-| `view.query`、`event.complete`、`event.count_increment`、`service.status`、`quota.refresh` | ✅ | ✅ |
+| `view.query`、`event.complete`、`event.increment_count`、`service.status`、`quota.refresh` | ✅ | ✅ |
 | `window.show_main`、`widget.get_state` | ✅ | ✅ |
 | `capture.*`、`ai.*`、`event.get/update/delete/create/restore`、`settings.*`、`credentials.*`、`window.hide_main`、`app.quit`、`widget.show/hide/toggle/set_*` | ✅ | ❌ |
 | `maintenance.run`（仅 debug 构建注册） | ✅（仅 debug） | ❌ |
@@ -592,3 +594,4 @@ idle
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：公共类型（Event/Occurrence/ViewResult/ServiceStatus）、命令清单与详情、事件推送、错误映射、状态机、重试策略、能力白名单 | tech-writer |
 | v0.2 | 2026-11-01 | 红队修复：新增 §4.18 `maintenance.run`（仅 debug、main 白名单，触发 24h 清理/周期重置）；§1.4/§4.16 明确额度重置权威=网关、客户端只展示 `X-Quota-Reset-At`；§4.5 补 `capture_id`↔`batch_id` 映射；§6/§9 同步 | tech-writer |
+| v0.3 | 2026-11-01 | 计数语义（用户确认）：命令统一为 `event.increment_count`，+1 不封顶（progress 可 > target，如 4/3）；计数无完成态（不写 completed_at、不进折叠、无 24h 删除、无恢复），仅周期边界复位；`ViewResult.completed` 移除 `counts`；§1.1/§1.3/§4.10/§4.11/§4.12/§5/§9 同步 | tech-writer |

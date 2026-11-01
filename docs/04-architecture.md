@@ -1,9 +1,10 @@
 # Clarify 技术架构（Architecture）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.2（红队修复稿；v0.1 初稿）
+- 版本：v0.3（计数语义用户确认稿；v0.2 红队修复稿）
 - 更新日期：2026-11-01
 - 本次修订（v0.2，按红队报告 ①）：P0-03 新增 §3.5「时间与可测性」（Clock 注入 / maintenance 触发 / DB 路径注入）；P1-01 §6.1 将 DB 路径定稿为唯一事实源；P1-02 §6.2 修正计数生命周期（无完成日志、不写 `completed_at`、无 24 h 删除）；P1-05 §5.6 标注额度重置权威；P1-06 录音上限口径统一为 15 s（§3.4/§4.1/§5.2）；P1-09 §6.1/§7 保留期引用 11；P0-04 §5.4/§9 标注"临时默认（Q9 未确认）"。**修订章节：§3.4、§3.5、§4.1、§4.2、§5.2、§5.4、§5.6、§6.1、§6.2、§6.3、§9、§13、§14。**
+- 本次修订（v0.3，用户确认 2026-11-01）：§6.2 计数语义同步——`count_progress` 允许超过 `count_target`（如 4/3），达标/超额**不产生完成态**（不写 `completed_at`、不进折叠、无 24 h 删除），仅周期边界复位；§1.2 补"计数型无完成态"。修订章节：§1.2、§6.2、§14。
 - 状态：**开发前技术基线**。字段语义以 `03-domain-model.md` 为准，接口契约以 `05-contracts/*` 为准，产品行为以 `00-product-decisions.md`（v1.1）为准，架构取舍以 `06-adr/*` 为准；本文与上述文档冲突时以更上层文档为准并回改本文。
 - 关联：`06-adr/0001~0008`、`05-contracts/gateway-api.md`、`05-contracts/tauri-ipc.md`、`05-contracts/config-schema.md`、`05-contracts/error-taxonomy.md`、`08-engineering.md`、`docs/research/tech-stack.md`
 
@@ -47,7 +48,7 @@
 | 不做系统通知 | 00-decisions §7、D10/D27 | **无 notification 模块**；不申请 toast 权限；"提醒时间"字段不存在 |
 | 不做首次引导 | 00-decisions §6、D26 | 启动直接进主页面；无 onboarding 路由/状态机 |
 | 不做备份/导出/回收站 | 00-decisions §7、D14、ADR-0004 | 无导出代码路径；删除即物理删除；已完成 24 h 后物理删除 |
-| 两状态（未完成/已完成） | ADR-0004 | 用 `completed_at IS NULL` 表达状态，无 status 枚举、无收件箱 |
+| 两状态（未完成/已完成） | ADR-0004 | 用 `completed_at IS NULL` 表达状态，无 status 枚举、无收件箱；**计数型无完成态**（仅周期进度，见 §6.2/domain §8） |
 | 官方网关 + BYOK + 规则三模式 | D4、ADR-0001 | `AiService` 抽象 + 能力级降级（§5.1） |
 | Key 不落客户端（官方） | ADR-0006 | 官方模式客户端只持有激活码 + 设备 ID |
 | 一条事件 = 标题 + 时间/重复/计数（无类型） | D21 | 显示模板是渲染层规则，不进数据层 |
@@ -337,7 +338,7 @@ db  ──► error + clock
 | 未完成事件 | 一直存在，直到完成或被用户永久删除 | — |
 | 单次/无时间事件完成 | 所有视图底部折叠可见；`completed_at` 起 24 h 内可恢复；**24 h 后物理删除** | scheduler |
 | 重复任务完成（本次） | 写 `event_completions` 完成日志；系列保留并推进下一次；本次完成日志 24 h 后物理删除 | scheduler |
-| 计数任务 | `count_progress` + `count_period_key`；**无完成日志、永不写 `completed_at`、无 24 h 删除**；仅周期边界（每天 00:00 / 每周一 00:00）清零，完成态由 `count_progress >= count_target` 派生（domain §8、storage-schema §9.3） | scheduler（懒重置 + 清理兜底） |
+| 计数任务 | `count_progress` + `count_period_key`；**无完成日志、永不写 `completed_at`、无 24 h 删除**；`count_progress` 允许超过 `count_target`（如 4/3，目标仅显示参照），达标/超额**不产生完成态、不进"已完成"折叠**；仅周期边界（每天 00:00 / 每周一 00:00）清零（用户确认 2026-11-01；domain §8、storage-schema §9.3） | scheduler（懒重置 + 清理兜底） |
 | 用户删除 | 详情抽屉内删除 = 立即物理删除，**不可恢复**（无回收站） | ipc/db |
 | 捕捉中数据 | 只在内存（音频）或只在 UI（打字）；**不落盘**，崩溃即丢 | — |
 | 设置 | 持久化于 SQLite `settings` 表 key=`settings` 的文档（**无密钥**；见 config-schema） | settings |
@@ -584,3 +585,4 @@ Windows 11 22H2+、Node 24 + pnpm 10、Rust stable（MSVC toolchain）、VS 2022
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：Tauri 2 双窗口进程模型、模块边界、AI 三模式与能力级降级、无通知/无备份数据策略、性能预算、安全隐私、降级矩阵、依赖许可、环境、S4 风险与 spike | tech-writer |
 | v0.2 | 2026-11-01 | 红队修复：新增 §3.5 Clock/可测性约束（§4.1/§4.2 同步）；§6.1 DB 路径定稿唯一事实源并补测试注入；§6.2 计数生命周期修正（无日志/无 completed_at/无 24h 删除）；§5.6 额度重置权威 + 200 单位口径；§5.4/§9/§13 标注 Q9 临时默认；§6.3 命令名修正；§3.4 录音 15s 口径 | tech-writer |
+| v0.3 | 2026-11-01 | 用户确认计数语义：§6.2 允许 `count_progress > count_target`（4/3）、达标/超额无完成态/不折叠/无 24h 删除、仅周期边界复位；§1.2 补"计数型无完成态" | tech-writer |
