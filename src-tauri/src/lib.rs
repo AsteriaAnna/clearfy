@@ -123,32 +123,17 @@ fn rules_events(app: &AppHandle, text: &str) -> Result<Vec<NewEvent>, String> {
 
 #[tauri::command]
 async fn ai_parse(app: AppHandle, text: String) -> Result<AiParseOutcome, String> {
-    let cfg = ai::load_config(&app);
-    let (now_local, offset) = ai::now_local_strings();
-    let key = cfg
-        .deepseek_key
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string);
-    let (items, fallback, warning) = match key {
-        Some(key) => match ai::deepseek_parse(&text, &now_local, offset, &key).await {
-            Ok(v) if !v.is_empty() => (v, false, None),
-            Ok(_) => (
-                rules_events(&app, &text)?,
-                true,
-                Some("AI 未解析出任务，已用规则模式".to_string()),
-            ),
-            Err(e) => (
-                rules_events(&app, &text)?,
-                true,
-                Some(format!("AI 解析失败，已用规则模式：{e}")),
-            ),
-        },
-        None => (
+    let (items, fallback, warning) = match ai::gateway_parse(&app, &text).await {
+        Ok(v) if !v.is_empty() => (v, false, None),
+        Ok(_) => (
             rules_events(&app, &text)?,
             true,
-            Some("未配置 DeepSeek Key，当前为规则模式".to_string()),
+            Some("AI 未解析出任务，已用规则模式".to_string()),
+        ),
+        Err(e) => (
+            rules_events(&app, &text)?,
+            true,
+            Some(format!("AI 解析失败，已用规则模式：{e}")),
         ),
     };
     let state = app.state::<AppState>();
@@ -176,38 +161,21 @@ async fn ai_parse(app: AppHandle, text: String) -> Result<AiParseOutcome, String
 }
 
 #[tauri::command]
-async fn transcribe_audio(
-    app: AppHandle,
-    audio_base64: String,
-    format: String,
-) -> Result<String, String> {
-    let cfg = ai::load_config(&app);
-    let key = cfg
-        .doubao_key
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or("未配置豆包 Key")?;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(audio_base64.as_bytes())
-        .map_err(|e| e.to_string())?;
-    ai::doubao_transcribe(&bytes, &format, key).await
-}
-
-#[tauri::command]
 async fn transcribe_stream(app: AppHandle, pcm_base64: String) -> Result<String, String> {
-    let cfg = ai::load_config(&app);
-    let key = cfg
-        .doubao_key
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or("未配置豆包 Key")?
-        .to_string();
     let pcm = base64::engine::general_purpose::STANDARD
         .decode(pcm_base64.as_bytes())
         .map_err(|e| e.to_string())?;
-    ai::stream_transcribe(&pcm, &key).await
+    ai::gateway_transcribe(&app, &pcm).await
+}
+
+#[tauri::command]
+fn quota_status(app: AppHandle) -> ai::QuotaStatus {
+    ai::quota_status(&app)
+}
+
+#[tauri::command]
+async fn save_activation_code(app: AppHandle, code: String) -> Result<ai::QuotaStatus, String> {
+    ai::set_activation_code(&app, &code).await
 }
 
 #[tauri::command]
@@ -451,8 +419,9 @@ pub fn run() {
             open_main_today,
             create_from_capture,
             ai_parse,
-            transcribe_audio,
             transcribe_stream,
+            quota_status,
+            save_activation_code,
             quit_app
         ])
         .run(tauri::generate_context!())

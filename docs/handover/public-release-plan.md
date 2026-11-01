@@ -48,19 +48,19 @@
 - `LICENSE`（MIT）
 - 网关代码没有 Key；Key 只在云平台环境变量/Secrets
 
-## 部署状态（2026-11-01）
+## 部署与客户端状态（2026-11-01）
 
 - ✅ 阿里云 FC 已部署：函数 `clarify-gateway`（cn-hangzhou，nodejs20，256MB）
 - ✅ HTTP 触发器（匿名 GET/POST）
 - ✅ 函数 URL：`https://clarify-gateway-dsidnsbafc.cn-hangzhou.fcapp.run`
-- ✅ `/v1/health` 正常
-- ✅ `/v1/parse` 实测 DeepSeek 解析成功
-- ✅ `/v1/transcribe` 实测豆包流式识别成功
+- ✅ `/v1/health`、`/v1/parse`、`/v1/transcribe` 实测通过
 - ✅ 额度模式：`QUOTA_MODE=client`，免费 5 次解析 + 30 秒语音/天
+- ✅ 客户端已迁移：删除内置 Key，文字/语音走网关；设置页有额度和激活码
+- ✅ 公开版安装包正在重建（不含 Key）
 - ✅ 激活码 Secret 在本机 `%LOCALAPPDATA%\com.clarify.desktop\gateway-activation-secret.txt`
 - ⚠️ `s deploy` 输出把函数环境变量打印出来了；公开前建议轮换 DeepSeek/豆包 Key
 - ⚠️ 当前函数 URL 匿名可调，客户端计额度可被绕开；有量后加 Tablestore/Redis/API 网关限流
-- ⚠️ FC 默认域名会在响应头强制加 `content-disposition: attachment`，浏览器打开会下载 JSON；用命令行验证，客户端不受影响。需要浏览器展示可后续绑自定义域名/API 网关
+- ⚠️ FC 默认域名会强制 `content-disposition: attachment`，浏览器打开会下载；用命令行验证，客户端不受影响
 
 ## 待用户操作（部署）
 

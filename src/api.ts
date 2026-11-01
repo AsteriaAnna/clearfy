@@ -181,6 +181,45 @@ export interface AiParseOutcome {
   warning?: string | null;
 }
 
+export interface CodeStatus {
+  plan: string;
+  expires_at: number;
+  parse_limit: number;
+  parse_used: number;
+  parse_left: number;
+  voice_limit: number;
+  voice_used: number;
+  voice_left: number;
+}
+
+export interface QuotaStatus {
+  date: string;
+  free_parse_limit: number;
+  free_parse_used: number;
+  free_parse_left: number;
+  free_voice_limit: number;
+  free_voice_used: number;
+  free_voice_left: number;
+  code: CodeStatus | null;
+}
+
+export async function quotaStatus(): Promise<QuotaStatus> {
+  if (!isTauri) {
+    return {
+      date: todayISO(),
+      free_parse_limit: 5, free_parse_used: 0, free_parse_left: 5,
+      free_voice_limit: 30, free_voice_used: 0, free_voice_left: 30,
+      code: null,
+    };
+  }
+  return invoke<QuotaStatus>("quota_status");
+}
+
+export async function saveActivationCode(code: string): Promise<QuotaStatus> {
+  if (!isTauri) throw new Error("浏览器预览不支持激活码");
+  return invoke<QuotaStatus>("save_activation_code", { code });
+}
+
 export async function aiParse(text: string): Promise<AiParseOutcome> {
   if (!isTauri) {
     const created = await createFromCapture(text);
