@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use clarify_core::{Event, NewEvent, Store, SystemClock};
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 struct AppState {
     store: Mutex<Store>,
@@ -66,6 +66,16 @@ fn purge_expired(state: State<'_, AppState>) -> Result<clarify_core::PurgeResult
     store.purge(&state.clock).map_err(err)
 }
 
+#[tauri::command]
+fn open_main_today(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    let _ = app.emit("clarify://open-today", ());
+    Ok(())
+}
+
 fn db_path(app: &tauri::AppHandle) -> std::path::PathBuf {
     let dir = app
         .path()
@@ -90,7 +100,36 @@ pub fn run() {
                 store: Mutex::new(store),
                 clock,
             });
+
+            // 浮窗：独立透明窗口，300×220 起，A 最高 396 / B 最高 420
+            let builder = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
+                .title("Clarify")
+                .inner_size(300.0, 220.0)
+                .min_inner_size(300.0, 180.0)
+                .max_inner_size(300.0, 420.0)
+                .decorations(false)
+                .transparent(true)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .shadow(false)
+                .resizable(true);
+            let overlay = builder.build()?;
+            if let Ok(Some(monitor)) = app.primary_monitor() {
+                let scale = monitor.scale_factor();
+                let size = monitor.size();
+                let x = size.width as f64 - 300.0 * scale - 24.0 * scale;
+                let y = size.height as f64 - 220.0 * scale - 80.0 * scale;
+                let _ = overlay.set_position(PhysicalPosition::new(x, y));
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             list_open,
@@ -101,7 +140,8 @@ pub fn run() {
             increment_count,
             update_event,
             delete_event,
-            purge_expired
+            purge_expired,
+            open_main_today
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

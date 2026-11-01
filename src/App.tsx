@@ -122,6 +122,20 @@ export default function App() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | undefined;
+    void import("@tauri-apps/api/event").then(({ listen }) =>
+      listen("clarify://open-today", () => {
+        setView("today");
+        setSelected(null);
+        if (template === "a") setScale("day");
+        else setFilter("today");
+      }).then((fn) => { unlisten = fn; }),
+    );
+    return () => unlisten?.();
+  }, [template]);
+
   async function onComplete(ev: ClarifyEvent) {
     try {
       if (isCount(ev)) await incrementCount(ev.id);
