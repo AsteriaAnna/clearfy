@@ -49,6 +49,12 @@ fn increment_count(state: State<'_, AppState>, id: String) -> Result<Event, Stri
 }
 
 #[tauri::command]
+fn update_event(state: State<'_, AppState>, id: String, new: NewEvent) -> Result<Event, String> {
+    let store = state.store.lock().map_err(err)?;
+    store.update(&id, &new, &state.clock).map_err(err)
+}
+
+#[tauri::command]
 fn delete_event(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let store = state.store.lock().map_err(err)?;
     store.delete(&id).map_err(err)
@@ -93,6 +99,7 @@ pub fn run() {
             complete_event,
             restore_event,
             increment_count,
+            update_event,
             delete_event,
             purge_expired
         ])

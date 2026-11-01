@@ -242,6 +242,52 @@ impl Store {
         self.get(id)
     }
 
+    /// 编辑事件（保留 id/created_at/completed_at；计数改周期时复位进度）。
+    pub fn update(&self, id: &str, new: &NewEvent, clock: &dyn Clock) -> Result<Event, CoreError> {
+        let old = self.get(id)?;
+        let title = validate(new)?;
+        let repeat_interval = if new.repeat_freq.is_some() {
+            Some(new.repeat_interval.unwrap_or(1))
+        } else {
+            None
+        };
+        let weekdays_json = new
+            .repeat_weekdays
+            .as_ref()
+            .map(|d| serde_json::to_string(d).unwrap_or_default());
+        let (count_progress, count_period_key) = match (&old.count_period, &new.count_period) {
+            (Some(old_p), Some(new_p)) if old_p == new_p => (
+                old.count_progress,
+                old.count_period_key
+                    .clone()
+                    .or_else(|| Some(count_period_key(new_p, clock))),
+            ),
+            (_, Some(new_p)) => (0, Some(count_period_key(new_p, clock))),
+            _ => (0, None),
+        };
+        self.conn.execute(
+            "UPDATE events SET title=?1,due_date=?2,due_start_at=?3,due_end_at=?4,deadline_at=?5,
+             repeat_freq=?6,repeat_interval=?7,repeat_weekdays=?8,count_target=?9,count_period=?10,
+             count_progress=?11,count_period_key=?12 WHERE id=?13",
+            params![
+                title,
+                new.due_date,
+                new.due_start_at,
+                new.due_end_at,
+                new.deadline_at,
+                new.repeat_freq,
+                repeat_interval,
+                weekdays_json,
+                new.count_target,
+                new.count_period,
+                count_progress,
+                count_period_key,
+                id
+            ],
+        )?;
+        self.get(id)
+    }
+
     pub fn delete(&self, id: &str) -> Result<(), CoreError> {
         let n = self
             .conn
