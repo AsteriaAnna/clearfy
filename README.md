@@ -24,7 +24,7 @@
 | [docs/prototype-v0.1.html](docs/prototype-v0.1.html) | 可点击线框：主窗口 / 悬浮窗 / 捕捉条（浏览器打开） |
 | [docs/research/tech-stack.md](docs/research/tech-stack.md) | 技术选型研究报告（桌面壳、本机 ASR 部分有效；本机 LLM 降为可选） |
 | [docs/research/product-ux.md](docs/research/product-ux.md) | 产品与交互研究报告 |
-| `docs/adr/` | 架构决策记录（拍板后写入，待建） |
+| [docs/adr/0001-ai-service-model.md](docs/adr/0001-ai-service-model.md) | ADR-0001 草案：AI 能力由谁提供、API Key 放在哪（待拍板） |
 | `docs/research/spike-results.md` | 技术尖峰实测结果（待建） |
 
 ## 产品一句话
