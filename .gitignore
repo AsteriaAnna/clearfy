@@ -12,3 +12,6 @@ dist-ssr/
 src-tauri/target/
 .vite/
 .DS_Store
+
+# Rust workspace build output
+/target/
