@@ -2,9 +2,11 @@
 
 const { verifyCode } = require('./activation');
 
-const FREE_PARSE_PER_DAY = Number(process.env.FREE_PARSE_PER_DAY || 20);
-const FREE_VOICE_SECONDS_PER_DAY = Number(process.env.FREE_VOICE_SECONDS_PER_DAY || 300);
+const FREE_PARSE_PER_DAY = Number(process.env.FREE_PARSE_PER_DAY || 5);
+const FREE_VOICE_SECONDS_PER_DAY = Number(process.env.FREE_VOICE_SECONDS_PER_DAY || 30);
 const TABLE = process.env.TABLESTORE_TABLE || 'clarify_quota';
+// server：服务端扣额度（需要 Tablestore/Redis）；client：客户端计数（零存储、可被绕过，适合首版）
+const QUOTA_MODE = (process.env.QUOTA_MODE || 'server').toLowerCase();
 
 /** 仅无 Tablestore 配置时兜底：单实例内存，重启即丢；生产必须配 Tablestore。 */
 const memory = new Map();
@@ -88,6 +90,20 @@ function limitInfo(rec, limit, kind) {
  * 返回最新额度信息。
  */
 async function consumeQuota({ deviceId, activationCode, ip, parse = 0, voiceSec = 0 }) {
+  if (QUOTA_MODE === 'client') {
+    let code = null;
+    if (activationCode) {
+      const payload = verifyCode(activationCode);
+      code = { plan: payload.plan, expiresAt: payload.expiresAt, parseQuota: payload.parseQuota, voiceSeconds: payload.voiceSeconds };
+    }
+    return {
+      mode: 'client',
+      freeParse: { limit: FREE_PARSE_PER_DAY, left: null },
+      freeVoice: { limit: FREE_VOICE_SECONDS_PER_DAY, left: null },
+      code,
+      memoryOnly: true,
+    };
+  }
   const day = todayKey();
   const freePk = `free:${deviceId || ip || 'anon'}:${day}`;
   const free = await readRow(freePk);
@@ -149,6 +165,23 @@ async function consumeQuota({ deviceId, activationCode, ip, parse = 0, voiceSec 
 }
 
 async function quotaInfo({ deviceId, activationCode, ip }) {
+  if (QUOTA_MODE === 'client') {
+    let code = null;
+    if (activationCode) {
+      try {
+        const payload = verifyCode(activationCode);
+        code = { plan: payload.plan, expiresAt: payload.expiresAt, parseQuota: payload.parseQuota, voiceSeconds: payload.voiceSeconds };
+      } catch {
+        code = null;
+      }
+    }
+    return {
+      mode: 'client',
+      freeParse: { limit: FREE_PARSE_PER_DAY, left: null },
+      freeVoice: { limit: FREE_VOICE_SECONDS_PER_DAY, left: null },
+      code,
+    };
+  }
   const day = todayKey();
   const freePk = `free:${deviceId || ip || 'anon'}:${day}`;
   const free = await readRow(freePk);
@@ -175,4 +208,4 @@ async function quotaInfo({ deviceId, activationCode, ip }) {
   };
 }
 
-module.exports = { consumeQuota, quotaInfo, FREE_PARSE_PER_DAY, FREE_VOICE_SECONDS_PER_DAY, todayKey };
+module.exports = { consumeQuota, quotaInfo, FREE_PARSE_PER_DAY, FREE_VOICE_SECONDS_PER_DAY, todayKey, QUOTA_MODE };

@@ -3,6 +3,7 @@
 const { parseText } = require('./deepseek');
 const { transcribePcm } = require('./doubao');
 const { consumeQuota, quotaInfo } = require('./quota');
+const { QUOTA_MODE } = require('./quota');
 
 function appError(status, code, message) {
   return Object.assign(new Error(message), { status, code });
@@ -41,8 +42,9 @@ async function handle({ method, path, headers, body, query }) {
         deepseekConfigured: Boolean(process.env.DEEPSEEK_API_KEY),
         doubaoConfigured: Boolean(process.env.DOUBAO_API_KEY),
         tablestoreConfigured: Boolean(process.env.TABLESTORE_ENDPOINT && process.env.TABLESTORE_INSTANCE),
-        freeParsePerDay: Number(process.env.FREE_PARSE_PER_DAY || 20),
-        freeVoiceSecondsPerDay: Number(process.env.FREE_VOICE_SECONDS_PER_DAY || 300),
+        quotaMode: QUOTA_MODE,
+        freeParsePerDay: Number(process.env.FREE_PARSE_PER_DAY || 5),
+        freeVoiceSecondsPerDay: Number(process.env.FREE_VOICE_SECONDS_PER_DAY || 30),
       },
     };
   }

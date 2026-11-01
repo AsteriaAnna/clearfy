@@ -14,7 +14,15 @@
 | 激活码 | HMAC 签名；可加解析次数、语音秒数、有效期；不需要账号 |
 | 额度存储 | 早期用 Cloudflare D1（免费额度）；阿里云备选 Tablestore |
 | 客户端配置 | 用户不需要配置 Key；可选填激活码 |
-| 早期部署 | **Cloudflare Workers + D1**（我可以 wrangler 部署）；阿里云 FC 作为大陆访问不稳时的备选 |
+| 早期部署 | **阿里云 FC 免费额度**（大陆稳定）；Cloudflare 实测不可用（见下） |
+| 额度存储 | 首版先不做服务端计数：客户端计数 + 激活码签名 + API 预算告警；有量后再接 Tablestore/Redis |
+
+## 2026-11-01 Cloudflare 实测结论
+
+- 本机访问 `workers.dev` 返回 200，但 **`dash.cloudflare.com` 返回 403**，`wrangler login` 两种方式都超时，无法登录/创建账号
+- 用户主要在大陆，`*.workers.dev` 各省差异大，不适合作为大陆主线路
+- Cloudflare Worker + D1 代码已写好（`gateway-cloudflare/`，本地 wrangler 跑通），保留为海外/备选方案
+- 结论：**公开主线路用阿里云函数计算**
 
 ## 架构
 

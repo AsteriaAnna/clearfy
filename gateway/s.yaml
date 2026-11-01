@@ -21,6 +21,9 @@ resources:
         TABLESTORE_INSTANCE: ${env(TABLESTORE_INSTANCE)}
         ALIBABA_CLOUD_ACCESS_KEY_ID: ${env(ALIBABA_CLOUD_ACCESS_KEY_ID)}
         ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${env(ALIBABA_CLOUD_ACCESS_KEY_SECRET)}
+        QUOTA_MODE: client
+        FREE_PARSE_PER_DAY: '5'
+        FREE_VOICE_SECONDS_PER_DAY: '30'
       triggers:
         - triggerName: http
           triggerType: http
