@@ -1,0 +1,31 @@
+edition: 3.0.0
+name: clarify-gateway
+access: default
+
+resources:
+  clarify-gateway:
+    component: fc3
+    props:
+      region: cn-hangzhou
+      functionName: clarify-gateway
+      runtime: nodejs20
+      handler: index.handler
+      code: ./
+      memorySize: 256
+      timeout: 60
+      environmentVariables:
+        DEEPSEEK_API_KEY: ${env(DEEPSEEK_API_KEY)}
+        DOUBAO_API_KEY: ${env(DOUBAO_API_KEY)}
+        ACTIVATION_SECRET: ${env(ACTIVATION_SECRET)}
+        TABLESTORE_ENDPOINT: ${env(TABLESTORE_ENDPOINT)}
+        TABLESTORE_INSTANCE: ${env(TABLESTORE_INSTANCE)}
+        ALIBABA_CLOUD_ACCESS_KEY_ID: ${env(ALIBABA_CLOUD_ACCESS_KEY_ID)}
+        ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${env(ALIBABA_CLOUD_ACCESS_KEY_SECRET)}
+      triggers:
+        - triggerName: http
+          triggerType: http
+          triggerConfig:
+            authType: anonymous
+            methods:
+              - GET
+              - POST

@@ -15,3 +15,8 @@ src-tauri/target/
 
 # Rust workspace build output
 /target/
+
+# Gateway
+gateway/node_modules/
+gateway/.env
+gateway/*.zip

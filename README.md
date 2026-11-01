@@ -35,7 +35,14 @@
 | [research/](docs/research/) | 早期技术/产品研究（历史证据） |
 | [design-v0.1~v0.3](docs/design-v0.3.md) | 历史设计稿（已被产品决策取代） |
 | [prototype-v0.1.html](docs/prototype-v0.1.html) | 旧线框（已过时，待删/替换为 v0.2） |
-| [ops/official-ai-gateway-setup.md](docs/ops/official-ai-gateway-setup.md) | 官方 AI 服务注册/部署指南 |
+| [ops/official-ai-gateway-setup.md](docs/ops/official-ai-gateway-setup.md) | 官方 AI 服务注册/部署指南（历史方案） |
+| [gateway/](gateway/) | 公开版官方网关（阿里云函数计算 + Tablestore 额度） |
+| [docs/handover/public-release-plan.md](docs/handover/public-release-plan.md) | 公开版决策与待办（MIT / GitHub / 网关） |
+| [LICENSE](LICENSE) | MIT 许可证 |
+
+## 公开版架构
+
+公开仓库与安装包**不含任何 API Key**；客户端调用官方网关（`gateway/`），Key 只在阿里云函数计算环境变量里。免费额度：每设备每天 20 次解析 + 300 秒语音；激活码可加量。部署说明见 [gateway/README.md](gateway/README.md)。
 
 ## 产品一句话
 

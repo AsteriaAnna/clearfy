@@ -1,0 +1,17 @@
+{
+  "name": "clarify-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Clarify official AI gateway (Aliyun Function Compute)",
+  "main": "index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node dev-server.js",
+    "gen-code": "node tools/gen-activation.js",
+    "check": "node --check index.js && node --check lib/deepseek.js && node --check lib/doubao.js && node --check lib/quota.js && node --check lib/activation.js"
+  },
+  "dependencies": {
+    "tablestore": "^5.4.0",
+    "ws": "^8.18.0"
+  }
+}
