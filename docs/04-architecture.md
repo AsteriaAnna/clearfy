@@ -1,8 +1,9 @@
 # Clarify 技术架构（Architecture）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.1（初稿，待评审冻结）
+- 版本：v0.2（红队修复稿；v0.1 初稿）
 - 更新日期：2026-11-01
+- 本次修订（v0.2，按红队报告 ①）：P0-03 新增 §3.5「时间与可测性」（Clock 注入 / maintenance 触发 / DB 路径注入）；P1-01 §6.1 将 DB 路径定稿为唯一事实源；P1-02 §6.2 修正计数生命周期（无完成日志、不写 `completed_at`、无 24 h 删除）；P1-05 §5.6 标注额度重置权威；P1-06 录音上限口径统一为 15 s（§3.4/§4.1/§5.2）；P1-09 §6.1/§7 保留期引用 11；P0-04 §5.4/§9 标注"临时默认（Q9 未确认）"。**修订章节：§3.4、§3.5、§4.1、§4.2、§5.2、§5.4、§5.6、§6.1、§6.2、§6.3、§9、§13、§14。**
 - 状态：**开发前技术基线**。字段语义以 `03-domain-model.md` 为准，接口契约以 `05-contracts/*` 为准，产品行为以 `00-product-decisions.md`（v1.1）为准，架构取舍以 `06-adr/*` 为准；本文与上述文档冲突时以更上层文档为准并回改本文。
 - 关联：`06-adr/0001~0008`、`05-contracts/gateway-api.md`、`05-contracts/tauri-ipc.md`、`05-contracts/config-schema.md`、`05-contracts/error-taxonomy.md`、`08-engineering.md`、`docs/research/tech-stack.md`
 
@@ -118,7 +119,7 @@
 **启动顺序**（Rust 侧 `app::bootstrap`）：
 
 1. `tauri-plugin-single-instance` 检测；已有实例 → 唤起它的主窗口后退出本进程（不创建第二个悬浮窗）。
-2. 加载设置 JSON → 校验/迁移（`05-contracts/config-schema.md`）。
+2. 从 SQLite `settings` 表加载 `settings` 配置文档 → 校验/迁移（`05-contracts/config-schema.md`）。
 3. 打开 SQLite → `quick_check` → 执行迁移（事务内；失败则只读安全模式，见 §6.4）。
 4. 启动调度器（启动即做一次对账清理：24 h 物理删除 + 计数周期重置）。
 5. 注册全局快捷键（失败 → `CLR-E6001`，不阻塞启动，设置页可改键重试）。
@@ -144,9 +145,26 @@
 
 并发规则：
 
-- 同一 `capture_id` 的 `ai_transcribe` 只允许一次（音频句柄一次性消费；重复调用返回 `CLR-E3003`/已消费错误）。
+- 同一 `capture_id` 的 `ai_transcribe` 只允许一次（音频句柄一次性消费；重复调用返回 `CLR-E3009`）。
 - 所有写命令带客户端 `op_id`（见 `tauri-ipc.md` §重试），Rust 侧做 60 s 去重，防止前端重试导致重复完成/重复 +1。
 - 事件推送由 Rust 统一 `emit`，前端不做跨窗口直接通信；两个窗口通过事件 + 重新查询保持一致（主窗与悬浮窗可能同时可见）。
+
+### 3.5 时间与可测性（P0-03）
+
+业务时间**只能**通过注入的 `Clock` 获取，禁止业务模块直接调用系统时间：
+
+| 项 | 约束 |
+|---|---|
+| 唯一时间源 | `Clock` trait（`src-tauri/src/clock/`）；`AppState` 持有 `Arc<dyn Clock>` 并注入所有模块（db/capture/ai/scheduler/ipc…） |
+| 接口 | `now_utc() -> DateTime<Utc>`；`local_date() -> NaiveDate`；`local_week_key() -> String`（ISO 周键 `YYYY-Www`）；时区取系统时区，由实现封装 |
+| 生产实现 | `SystemClock`：读系统时钟；**仅此实现**允许 `SystemTime::now()` / `Utc::now()` / `Local::now()` |
+| 测试实现 | `FakeClock`：可设定/推进时间（秒级），用于 24 h 边界、计数跨日/跨周、时钟回拨（domain §6.5） |
+| 禁止 | 业务模块出现 `SystemTime::now()`、`Utc::now()`、`Local::now()`、直接 `chrono::Local` / `time::OffsetDateTime::now_utc`；CI 用 `rg` 守门（08-engineering §3.2/§6） |
+| 写入时间 | `created_at`/`completed_at` 等由 Clock 提供（回拨规则见 domain §6.5）；发给 AI 的 `now` 也来自 Clock，不接受前端/外部输入覆盖（`ai.parse` 的 `now` 入参仅 debug 构建接受） |
+| 测试触发 | 24 h 清理/周期重置的生产触发为启动、每 60 分钟、唤醒；测试走 `maintenance.run{now_override?}`（仅 debug 注册，能力白名单仅 main，见 tauri-ipc §4.18），注入 now 立即执行一轮清理/重置并断言（满足 07-test-strategy TQ-1/TQ-2，不需要真实等待） |
+| 显示边界 | 业务边界判断（逾期/今天/周期键/24 h）全部在 Rust 侧用 Clock 计算；前端只渲染下发的 UTC/派生字段，不自行"现在"推算业务边界 |
+
+> 该约束是 M1 出口 DoD 的一部分（07-test-strategy §11.3）；实现时以 `clock` 模块为唯一入口，任何例外需在 PR 说明理由并登记。
 
 ---
 
@@ -156,8 +174,9 @@
 
 | 模块 | 位置（建议） | 职责 | 明确不做 | 关键依赖 |
 |---|---|---|---|---|
-| `app` | `src-tauri/src/app/` | 启动/退出、单实例、模块装配、AppState | 业务规则 | 所有模块 |
-| `db` | `src-tauri/src/db/` | SQLite 连接与事务、迁移（`migrations/*.sql` 薄执行器，见 storage-schema §3.3）、Event/完成日志/设置读写、视图查询 SQL | 不做 AI、不做窗口 | rusqlite |
+| `app` | `src-tauri/src/app/` | 启动/退出、单实例、模块装配、AppState、DB 路径常量（唯一） | 业务规则 | 所有模块 |
+| `clock` | `src-tauri/src/clock/` | `Clock` trait + `SystemClock`/`FakeClock`；唯一时间来源（`now_utc`/`local_date`/`local_week_key`） | 不承载业务规则、不直接读配置 | 无（仅 chrono） |
+| `db` | `src-tauri/src/db/` | SQLite 连接与事务、迁移（`migrations/*.sql` 薄执行器，见 storage-schema §3.3）、Event/完成日志/设置读写、视图查询 SQL | 不做 AI、不做窗口 | rusqlite、clock |
 | `capture` | `src-tauri/src/capture/` | 麦克风采集、16 kHz 单声道重采样、VAD/静音断句、15 s 上限、WAV 编码（内存） | 不落盘、不转写 | cpal、rubato、hound |
 | `asr` | `src-tauri/src/asr/` | `AsrProvider` trait；官方网关实现、BYOK 直连实现 | 不解析语义、不存音频 | reqwest（官方）、WS 客户端（BYOK，待 spike） |
 | `ai` | `src-tauri/src/ai/` | 模式/能力决策、`ParseProvider` trait（官方/BYOK）、规则解析器、JSON Schema 校验、批量落库编排 | 不弹窗、不阻塞捕捉 UI | serde_json、jsonschema（或手写校验）、db |
@@ -175,18 +194,19 @@
 允许的依赖方向（上层可依赖下层，禁止反向）：
 
 ```
+所有模块 ──► clock（只读时间；Clock 不依赖任何业务模块）
 ipc ──► app/settings/window/capture/ai/quota
 ai  ──► asr?（否：ai 只依赖 db + parse provider；asr 独立）
 capture ──► (无业务依赖)
 asr ──► credentials + error
-ai  ──► credentials + db + error
-scheduler ──► db
+ai ──► credentials + db + error
+scheduler ──► db + clock
 window ──► settings + error
 settings ──► db + error
-db  ──► error
+db  ──► error + clock
 ```
 
-禁止：`db` 调用 `window`/`ipc`；`capture` 直接发网络；`window` 直接查 DB；任何模块直接读 `settings` 密钥字段（密钥只在 `credentials` 与发起请求的 `asr`/`ai` 之间流动）。
+禁止：`db` 调用 `window`/`ipc`；`capture` 直接发网络；`window` 直接查 DB；任何模块直接读 `settings` 密钥字段（密钥只在 `credentials` 与发起请求的 `asr`/`ai` 之间流动）；**任何模块直接调用系统时间 API（必须经 `Clock` 注入）**；**任何模块硬编码 DB 路径（唯一常量在 `app` 启动层，注入给 `db`；测试经 `CLARIFY_DB_PATH` 注入）**。
 
 ### 4.3 前端 ↔ 原生层边界
 
@@ -245,7 +265,7 @@ db  ──► error
       │                                  ├─ POST {gateway}/v1/parse → deepseek-flash JSON
       │                                  ├─ Schema 校验（ai-json.md）
       │                                  ├─ 失败 → 规则解析兜底（§5.5）
-      │                                  └─ db::insert_batch(tasks, batch_id) 单事务
+      │                                  └─ db::insert_events(events, batch_id) 单事务
       │ ◄── {batch_id, events[], mode_used, degraded, timings} + 事件 event.created ×n
       ▼
   捕捉条临时草稿卡 → 替换为真实任务；视图失效重查；轻提示"已安排 · 明天 15:00"
@@ -271,7 +291,7 @@ db  ──► error
 - 文字捕捉 = 同一捕捉条直接打字（无麦克风）；`ai_parse` 入参 `source=text`，`capture_id` 可空。
 - `ai.mode=rules` 或降级到规则时：`ai::rules` 用本地词典/正则做时间表达（明早、下周三、三点半）、简单重复（每天/每周一）、分句拆条（和/还有/逗号），**只解析明确内容**；无法确定就留空（不猜、不补默认，见 00-decisions §3）。
 - 规则解析产出的条数上限与拆分策略与 LLM 一致（单次 ≤5 条），超限截断并提示。
-- 规则解析失败（极少）→ 整段原文作为一条标题、无时间/重复/计数；**保留原文标题**（00-decisions §10-4 的默认行为，待用户确认后固化）。
+- 规则解析失败（极少）→ 整段原文作为一条标题、无时间/重复/计数；**保留原文标题**——这是 **临时默认（Q9 未确认）**，不是最终决定；用户确认后回写此处、`ai-json.md` §7.3、`error-taxonomy.md` E4005 与 PRD/UX 文案。
 
 ### 5.5 解析输出校验与兜底顺序
 
@@ -288,7 +308,7 @@ db  ──► error
   index.handler
    ├─ 路由：GET /v1/health | POST /v1/transcribe | POST /v1/parse
    ├─ 鉴权：X-Activation-Code（HMAC 比对哈希白名单，常量时间）+ X-Device-Id 规范化
-   ├─ 配额：每设备每日 200 次（北京时间 00:00 重置）；月预算 ¥200（80% 告警/100% 停止）
+   ├─ 配额：每设备每日 **200 单位**（1 单位 = 1 次捕捉，转写+解析合并计 1；北京时间 00:00 重置）；月预算 ¥200（80% 告警/100% 停止）
    ├─ 转发：ASR provider 适配层（默认候选百炼实时 WS）；DeepSeek /chat/completions
    ├─ 校验：解析 JSON 结构；失败重试 1 次
    ├─ 用量：写 OSS 记录（只含状态/延迟/用量/哈希，不含音频与正文）
@@ -296,13 +316,15 @@ db  ──► error
 ```
 网关无状态、无数据库、无音频存储；用量记录在 OSS（生命周期规则自动过期）。配额/预算的原子性与精度风险见 gateway-api.md §6 与 Spike S2。
 
+> **额度重置权威（P1-05）**：重置时间由**网关**按北京时间 00:00 判定，客户端只展示网关返回的 `X-Quota-Reset-At` / `ServiceStatus.quota.reset_at`，**不得按本地时区自行推算或倒计时到本地零点**（防改时区刷额度）。
+
 ---
 
 ## 6. 数据与生命周期（无通知 / 无备份策略）
 
 ### 6.1 存储
 
-- 唯一数据副本：`%LOCALAPPDATA%\{bundleIdentifier}\clarify.db`（SQLite，WAL；`bundleIdentifier` 建议 `app.clarify.desktop`，最终以 `tauri.conf.json` 为准）。
+- 唯一数据副本：**`%LOCALAPPDATA%\app.clarify.desktop\clarify.db`**（SQLite，WAL）。**本文是 DB 路径/文件名的唯一事实源**：`bundleIdentifier` 固定为 `app.clarify.desktop`；`05-contracts/storage-schema.md`、`11-release-ops.md`、`05-contracts/config-schema.md` 只引用本行、不另定义。测试/开发注入见 `config-schema.md` §10.4（`CLARIFY_ENV`/`CLARIFY_DB_PATH`，生产忽略）。
 - 表：`events`、`event_completions`、`settings`、`schema_migrations`（唯一事实源：`05-contracts/storage-schema.md`）。
 - 连接参数：`journal_mode=WAL`、`synchronous=NORMAL`、`foreign_keys=ON`、`busy_timeout=5000`；单写线程（§3.4）。
 - 日志文件（可选）：同目录 `logs/app.log`，滚动 ≤1 MB × 2，默认 `warn`，不含用户内容（§8.3）。
@@ -315,17 +337,17 @@ db  ──► error
 | 未完成事件 | 一直存在，直到完成或被用户永久删除 | — |
 | 单次/无时间事件完成 | 所有视图底部折叠可见；`completed_at` 起 24 h 内可恢复；**24 h 后物理删除** | scheduler |
 | 重复任务完成（本次） | 写 `event_completions` 完成日志；系列保留并推进下一次；本次完成日志 24 h 后物理删除 | scheduler |
-| 计数任务 | `progress` + `period_key`；周期边界（每天 00:00 / 每周一 00:00）重置；完成状态在边界消失；本期完成记录 24 h 后删除 | scheduler |
+| 计数任务 | `count_progress` + `count_period_key`；**无完成日志、永不写 `completed_at`、无 24 h 删除**；仅周期边界（每天 00:00 / 每周一 00:00）清零，完成态由 `count_progress >= count_target` 派生（domain §8、storage-schema §9.3） | scheduler（懒重置 + 清理兜底） |
 | 用户删除 | 详情抽屉内删除 = 立即物理删除，**不可恢复**（无回收站） | ipc/db |
 | 捕捉中数据 | 只在内存（音频）或只在 UI（打字）；**不落盘**，崩溃即丢 | — |
-| 设置 | 持久化 JSON（无密钥） | settings |
+| 设置 | 持久化于 SQLite `settings` 表 key=`settings` 的文档（**无密钥**；见 config-schema） | settings |
 
 调度器语义（`scheduler`）：
 
 - 触发：应用启动、每 **60 分钟**、系统唤醒后（定时器漂移 → 用**对账式扫描**而非精确延时；同一时刻单飞）。
 - 可见性：已完成项从**视图查询**层按 `completed_at + 24h` 过滤（到点即不再显示）；**物理删除**由清理作业在下一个 60 分钟窗口内完成（即 24h 后 ≤1h 内删除，storage-schema §9）。
-- 删除条件：`completed_at <= now - 24h`；重复/计数只删 `event_completions` 行，不删系列。
-- 计数器重置：按本机时区计算 `period_key`，与上一周期不同则置 `progress=0`、`completed_at=NULL`、更新 `period_key`。
+- 删除条件：**仅**删除两类数据——(a) 单次/无时间型已完成事件行（`completed_at <= now - 24h` 且 `repeat_freq IS NULL`、`count_target IS NULL`）；(b) 周期任务的 `event_completions` 行（`completed_at <= now - 24h`）。周期任务系列行永不因完成而删除；**计数任务不删除，只按周期键重置**。
+- 计数器重置：按 Clock 的 `local_week_key()`/`local_date()` 计算当前周期键，与存量不同则 `count_progress=0`、`count_period_key=当前键`；计数任务**永不写 `completed_at`**（domain §8）。
 - 删除后不额外 `VACUUM`；WAL autocheckpoint 由 SQLite 负责（storage-schema §2）。
 - 失败重试：下一次 tick 自动重试；**绝不删除未完成项**。
 - 精度：以"启动/唤醒对账"保证最终一致；已完成折叠的倒计时文案按 domain §4 展示（UI 文案由 02-ux-spec 定义）。
@@ -337,7 +359,7 @@ db  ──► error
 | 风险 | 不可用手段（产品已否决） | 保留的补偿控制 |
 |---|---|---|
 | 误删 | 回收站/撤销 | 删除入口收在详情抽屉、二次确认文案（UX 决定）；删除后不可恢复必须明示 |
-| 误完成 | 软归档/30 天恢复 | 24 h 内可恢复（`task_uncomplete`）；完成后 1 s 内从悬浮窗消失、主窗底部折叠 |
+| 误完成 | 软归档/30 天恢复 | 24 h 内可恢复（`event.restore`）；完成后 1 s 内从悬浮窗消失、主窗底部折叠 |
 | 换机/重装 | 导出/导入/云同步 | 明确告知"数据只在本机，不提供备份"（位置待定，00-decisions §10-17） |
 | 库损坏 | 备份文件 | 只读模式启动或提示"数据损坏，无法打开"（storage-schema §15）；不自动修复/重建、不生成数据库副本（storage-schema §11） |
 | 崩溃丢输入 | 音频落盘 | 录音 ≤15 s 且音频绝不落盘；已入库数据不丢（WAL 原子性）；处理中丢失必须在文档与 UI 文案中明示 |
@@ -432,7 +454,7 @@ BYOK 模式：
 | 7 | 每日额度用尽（429） | 网关 429 + 配额头 | "今日 AI 额度已用完，明天 00:00 恢复；当前用规则模式" | 当日不再调用官方；BYOK 优先，解析规则兜底 | 任务照常创建 | 次日 |
 | 8 | 月预算用尽（429） | 网关 429 + `X-Budget-State: exhausted` | "官方 AI 服务本月预算已用尽，服务暂停" | 官方全停；BYOK/规则继续 | 任务照常创建（规则） | 下月/作者调预算 |
 | 9 | 解析 JSON 非法/超时 | 校验失败/504 | 无感（轻提示"已用本地规则安排"） | 客户端规则兜底；记录错误码 | 任务照常创建 | 自动 1 次 |
-| 10 | 规则解析也无法动作化 | 规则返回 0 条 | 无感 | 用原文整段建 1 条、无时间（默认待确认 §10-4） | 任务照常创建 | — |
+| 10 | 规则解析也无法动作化 | 规则返回 0 条 | 无感 | 用原文整段建 1 条、无时间（**临时默认（Q9 未确认）**，见 ai-json §7.3） | 任务照常创建 | — |
 | 11 | 写库失败（磁盘满/损坏） | `rusqlite` 错误 | "保存失败，请重试；输入已保留" | 保留 UI 文本可重试；报 `CLR-E5002`；损坏 → 只读模式 | 未保存，UI 保留 | 用户重试 |
 | 12 | 热键注册冲突 | 注册返回失败 | 设置页提示改键（`CLR-E6001`） | 继续启动；悬浮窗与主窗仍可用 | 无 | 用户改键 |
 | 13 | 透明/毛玻璃不可用 | 窗口效果设置失败 | 无感（首次提示"已切换性能/兼容模式"） | 降级为不透明/低透明纯色 | 无 | 启动时重试 |
@@ -545,7 +567,7 @@ Windows 11 22H2+、Node 24 + pnpm 10、Rust stable（MSVC toolchain）、VS 2022
 | A1 | 托盘/后台驻留方式（00-decisions §10-16） | 主窗关闭行为、退出入口、开机自启 | 若无托盘：关闭主窗=隐藏、设置页退出；需用户确认 |
 | A2 | 隐私告知位置（§10-17） | 设置页/关于页文案与布局 | 建议设置页"关于/隐私"常驻区块 + 首次捕捉后提示一次（待定，不阻塞编码） |
 | A3 | 原始转写文本是否保留（§10-5） | 是否新增 `raw_text` 字段与"重新解析"入口 | v1 默认不保留（录音不落盘、原文只在当次 UI）；解析失败用原文标题兜底 |
-| A4 | AI 解析无法动作化时的兜底（§10-4） | 规则/兜底行为 | 默认"原文整段作标题、时间空"，待确认 |
+| A4 | AI 解析无法动作化时的兜底（00-decisions §10-4 / PRD Q9） | 规则/兜底行为与用户文案 | **临时默认（Q9 未确认）**：原文整段作标题、时间空、建 1 条；确认后回写本文 §5.4/§9、ai-json §7.3、error-taxonomy E4005、01/02/07 |
 | A5 | 悬浮窗视觉规格/穿透/全屏抑制（§10-2/3） | S4 验收细节 | Spike 后与视觉初稿一起定 |
 | A6 | BYOK 是否覆盖转写（本文 §5.3） | 是否需要客户端 WS 客户端 | S1 后决定；默认 v1 BYOK 仅解析 |
 | A7 | 网关配额/预算计数的原子性精度 | 是否引入 OTS/Tair | S2 后决定；v1 接受"≤数条超发 + 100% 停止" |
@@ -561,3 +583,4 @@ Windows 11 22H2+、Node 24 + pnpm 10、Rust stable（MSVC toolchain）、VS 2022
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：Tauri 2 双窗口进程模型、模块边界、AI 三模式与能力级降级、无通知/无备份数据策略、性能预算、安全隐私、降级矩阵、依赖许可、环境、S4 风险与 spike | tech-writer |
+| v0.2 | 2026-11-01 | 红队修复：新增 §3.5 Clock/可测性约束（§4.1/§4.2 同步）；§6.1 DB 路径定稿唯一事实源并补测试注入；§6.2 计数生命周期修正（无日志/无 completed_at/无 24h 删除）；§5.6 额度重置权威 + 200 单位口径；§5.4/§9/§13 标注 Q9 临时默认；§6.3 命令名修正；§3.4 录音 15s 口径 | tech-writer |

@@ -1,8 +1,9 @@
 # 工程规范（Engineering）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.1（初稿，待评审冻结）
+- 版本：v0.2（红队修复稿；v0.1 初稿）
 - 更新日期：2026-11-01
+- 本次修订（v0.2）：P0-03 工程约束——新增 §0 时间/路径原则、§1 边界纪律（Clock、DB 路径）、§3.1/§3.2 测试注入与 `lint:guards` 守门、§5 PR checklist 两条（时间必须走 Clock、禁止硬编码 DB 路径）、§6 CI 守门说明。修订章节：§0、§1、§3.1、§3.2、§5、§6、§12。
 - 状态：**开发前工程基线**。目录/工具链/脚本/分支/CI/秘密/文档规则以本文为准；构建与发布细节以 `11-release-ops.md` 为准；测试门禁以 `07-test-strategy.md` 为准。
 - 关联：`04-architecture.md`（模块边界）、`05-contracts/*`（契约）、`09-roadmap-wbs.md`（里程碑与任务）、`docs/handover/README.md`（交接）
 
@@ -16,6 +17,7 @@
 4. **无秘密进仓库**：Key/激活码/证书/签名私钥一律不进 Git、不进构建产物、不进日志（charter §10）。
 5. **Windows 为唯一 v1 目标**：CI/本地均以 Windows x64 为准；跨平台代码保持可移植但不做 macOS 验收。
 6. **零遥测**：不接入任何统计/崩溃上报 SDK；依赖引入需经 license/隐私审查。
+7. **时间与路径可测**：业务时间一律经注入的 `Clock`（禁止模块直调 `SystemTime::now`/`Utc::now`/`Local::now`）；DB 路径唯一常量在 `app` 启动层，禁止其他模块硬编码；测试用 `FakeClock` + `maintenance.run`（仅 debug）与 `CLARIFY_ENV`/`CLARIFY_DB_PATH` 隔离（见 04 §3.5、05-config §10.4）。
 
 ---
 
@@ -42,7 +44,8 @@ clarify/
 │
 ├─ src-tauri/                   # Rust 原生层（Tauri 2）
 │  ├─ src/
-│  │  ├─ app/                   # 启动/单实例/模块装配/生命周期
+│  │  ├─ app/                   # 启动/单实例/模块装配/生命周期 + DB 路径唯一常量（04 §6.1）
+│  │  ├─ clock/                 # Clock trait + SystemClock/FakeClock（唯一时间来源，04 §3.5）
 │  │  ├─ db/                    # rusqlite actor、迁移（storage-schema §3.3 薄 runner）、视图查询 SQL
 │  │  ├─ capture/               # cpal 录音、重采样、VAD、内存 WAV
 │  │  ├─ asr/                   # AsrProvider：官方网关 / BYOK 直连（待 S1）
@@ -87,6 +90,8 @@ clarify/
 
 - `src/`（前端）**禁止**：直接 `fetch`/`WebSocket`、读写文件、访问注册表、持有 Key、调用系统 API；一切经 `invoke`/事件。
 - `src-tauri/` 业务模块遵循 `04-architecture.md` §4.2 依赖方向；跨模块通信走接口/事件，不共享可变全局。
+- **时间**：只有 `clock/` 模块可以触碰系统时钟；其他模块接收注入的 `Clock`（`now_utc/local_date/local_week_key`），业务边界判定全部在 Rust 侧。
+- **DB 路径**：唯一常量在 `app/` 启动层（`%LOCALAPPDATA%\app.clarify.desktop\clarify.db`，04 §6.1）；`db/` 及其他模块只接收注入路径；测试经 `CLARIFY_DB_PATH`（config-schema §10.4），禁止任何模块硬编码路径。
 - `gateway/` 不引用客户端代码；契约类型各自维护但字段名以 `05-contracts/gateway-api.md` 为准。
 - `spike/` 代码允许丢弃，但必须能复现结论；不得被生产构建引用。
 
@@ -123,7 +128,7 @@ clarify/
 3. 安装 Node 24 LTS，`corepack enable`，`corepack prepare pnpm@10 --activate`。
 4. `git config core.longpaths true`（Windows 路径）。
 5. `pnpm install`（仓库根，自动装前端与 gateway）。
-6. 复制 `.env.example` → `.env.local`（开发用测试 Key；**不提交**）。
+6. 复制 `.env.example` → `.env.local`（开发用测试 Key；**不提交**）。开发/测试库隔离：`CLARIFY_ENV=dev|test` + `CLARIFY_DB_PATH`（**仅 dev/test 生效，生产忽略**；见 `05-contracts/config-schema.md` §10.4）。
 7. `pnpm dev` → 启动主窗 + 悬浮窗；或 `pnpm dev:web` 只在浏览器调试 UI（IPC 用 mock）。
 
 ### 3.2 常用脚本（`package.json`，root）
@@ -149,6 +154,7 @@ clarify/
 | `pnpm check:versions` | 校验 app/db schema/contract/gateway 版本一致性 | CI 必跑 |
 | `pnpm check:licenses` | cargo-deny licenses + 前端许可清单 | CI 必跑（§6） |
 | `pnpm db:reset` | **仅开发** 清空开发库（守卫 `CLARIFY_ENV=dev`） | 防止误伤用户数据 |
+| `pnpm lint:guards` | `rg` 守门：时间只能经 `clock/`；DB 路径不得硬编码（04 §3.5/§6.1） | CI `lint` 阶段调用 |
 | `pnpm spike:<name>` | 运行 `spike/` 下验证脚本 | 结果写 `docs/research/spike-results.md` |
 
 > 脚本名以本表为契约；新增脚本需同步本表。`11-release-ops.md` 引用的构建命令为 `pnpm tauri build`，不得替换为别名。
@@ -196,6 +202,8 @@ Test: <测试/评估证据>
 - [ ] 新增错误码已在 `05-contracts/error-taxonomy.md` 登记并给出中文文案、可重试性、降级动作。
 - [ ] 新增设置字段已进 `config-schema.md`（Schema + 默认值 + 迁移规则）；新 IPC 命令已进 `tauri-ipc.md` + `capabilities/`（按窗口白名单）。
 - [ ] 数据/schema 变更：迁移在事务内、版本单调、含迁移样本测试；**无备份可回滚**，必须证明旧数据不被破坏。
+- [ ] **时间必须走 `Clock`**：不新增 `SystemTime::now()`/`Utc::now()`/`Local::now()` 直调（`clock/` 除外）；24h/跨日/跨周用例在 `FakeClock` 或 `maintenance.run`（仅 debug）下演示，不真实等待（04 §3.5）。
+- [ ] **禁止硬编码 DB 路径**：路径只来自 `app` 启动层唯一常量（04 §6.1）；测试用 `CLARIFY_ENV`/`CLARIFY_DB_PATH` 注入，不触碰生产库。
 - [ ] 测试：新增/修改逻辑有单测；领域规则对照 `03-domain-model.md` §12 用例；网关契约测试覆盖错误码/配额边界。
 - [ ] AI 相关（prompt/模型/供应商/JSON 契约）已跑 `pnpm eval:ai` 并附报告；未达标不得默认启用。
 - [ ] 性能预算核对（热键/端到端/内存/包体，见 04-architecture §7）；可疑项附测量数据。
@@ -218,7 +226,7 @@ Test: <测试/评估证据>
 | # | 阶段 | 内容 | 失败门禁 | 预算 |
 |---|---|---|---|---|
 | 1 | setup | Node 24 + pnpm(cache) + Rust(cache) + WebView2（仅需要运行时） | 安装失败 | 2 min |
-| 2 | `lint` | `cargo fmt --check`、`cargo clippy -- -D warnings`、ESLint、Prettier、`tsc --noEmit`（前端+gateway） | 任一失败 | 4 min |
+| 2 | `lint` | `cargo fmt --check`、`cargo clippy -- -D warnings`、`pnpm lint:guards`（时间/DB 路径守门）、ESLint、Prettier、`tsc --noEmit`（前端+gateway） | 任一失败 | 4 min |
 | 3 | `test` | `cargo test`、`vitest run`、gateway 契约测试（mock 上游） | 单测失败/覆盖核心规则回归 | 8 min |
 | 4 | `build` | `vite build` + `cargo check`（debug，不打包安装包） | 构建失败 | 6 min |
 | 5 | `eval-rules` | `pnpm eval:rules`（离线、确定性） | 指标低于 `docs/eval/README.md` 基线 | 1 min |
@@ -226,6 +234,8 @@ Test: <测试/评估证据>
 | 7 | `security` | `gitleaks`、`cargo-audit`、`cargo-deny`（licenses/advisories）、`pnpm audit --prod` | 发现问题（可配置 ignore 清单，必须写理由+到期日） | 4 min |
 
 - 所有 job 在 Windows runner 上跑（单平台，避免 Linux/Windows 行为差异导致的假绿）。
+- **时间/路径守门（`pnpm lint:guards`，04 §3.5/§6.1）**：用 `rg` 断言 `src-tauri/src/clock/**` 之外不出现 `SystemTime::now|Utc::now|Local::now`；`src-tauri/src/app/**` 之外不出现硬编码 `clarify.db`/`LOCALAPPDATA`/生产 DB 路径；命中即失败（允许清单需 PR 说明并登记）。
+- 24h/周期边界测试用 `FakeClock` + 仅 debug 注册的 `maintenance.run{now_override?}`（tauri-ipc §4.18），禁止真实 `sleep`；DB 隔离用 `CLARIFY_ENV=test` + `CLARIFY_DB_PATH`（config-schema §10.4）。
 - 缓存：`~/.cargo`、`src-tauri/target`、pnpm store；key 含 `Cargo.lock`/`pnpm-lock.yaml` 哈希。
 - 依赖机器：不使用 self-hosted（v1）；单次 CI 总预算 ≤25 min。
 - 测试与诊断产物：失败时上传日志；**不得上传用户数据/音频**（CI 内无真实用户数据）。
@@ -362,3 +372,4 @@ Test: <测试/评估证据>
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：仓库结构、工具链版本、脚本表、分支/提交规范、PR checklist、CI 阶段、秘密管理、文档更新规则、交接要求 | tech-writer |
+| v0.2 | 2026-11-01 | 红队修复（P0-03）：§0/§1 增加时间（Clock）与 DB 路径边界；§3.1 测试库注入；§3.2 新增 `lint:guards`；§5 PR checklist 增两条；§6 CI 增守门说明 | tech-writer |

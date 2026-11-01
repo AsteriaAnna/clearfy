@@ -1,8 +1,9 @@
 # 配置契约（config-schema）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.1（初稿，待评审冻结）
+- 版本：v0.2（红队修复稿；v0.1 初稿）
 - 更新日期：2026-11-01
+- 本次修订（v0.2）：P0-03 新增 §10.4 测试/开发注入（`CLARIFY_ENV`/`CLARIFY_DB_PATH`，仅 dev/test 生效，生产忽略；引用 04 §6.1 的 DB 路径唯一事实源）、§0 增总览行；P2-11 快捷键 schema 去掉不可执行的 `$ACCELERATOR` pattern，改由 §8.4 语义校验。修订章节：§0、§2、§10、§11、§13。
 - 状态：**v1 冻结候选**。设置结构、默认值、校验、迁移以本文为准；**凭据（激活码/BYOK Key）不在本文 JSON 内**，见 §9。
 - 关联：`00-product-decisions.md` §5/§7、`06-adr/0004-data-and-deletion.md`、`06-adr/0006-keys-privacy.md`、`06-adr/0008-visual-naming.md`、`04-architecture.md`、`05-contracts/tauri-ipc.md`（`settings.*`、`credentials.*` 命令）、`05-contracts/storage-schema.md`（`settings` 表）
 
@@ -19,6 +20,7 @@
 | 版本字段 | `schema_version`（整数，当前 `1`）；迁移规则见 §10 |
 | 校验 | JSON Schema（§2，结构）+ 语义校验（§8，跨字段/范围/快捷键合法性）；非法值拒绝整次写入并回滚 |
 | 默认值来源 | 本文 §3；代码中不得另写一套默认值，启动时用本文默认值做 normalize |
+| 测试/开发注入 | `CLARIFY_ENV` / `CLARIFY_DB_PATH` 环境变量（**非设置 JSON**，仅 dev/test 构建生效、生产忽略）；DB 路径唯一事实源见 04 §6.1，注入规则见 §10.4 |
 | 未确认项 | 开机自启、语言、关闭主窗行为、隐私告知确认等**未列入**（见 §12 待定）；避免预先堆字段 |
 
 ---
@@ -227,8 +229,8 @@
       "additionalProperties": false,
       "required": ["capture", "toggle_widget"],
       "properties": {
-        "capture": { "type": "string", "pattern": "$ACCELERATOR" },
-        "toggle_widget": { "type": "string", "pattern": "$ACCELERATOR" }
+        "capture": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "toggle_widget": { "type": "string", "minLength": 1, "maxLength": 64 }
       }
     }
   },
@@ -246,7 +248,7 @@
 }
 ```
 
-> `$ACCELERATOR` 为占位（JSON Schema 数组内不便于写完整 pattern）：实际校验见 §8.4，允许的键名集合 = `[A-Z0-9]`/`F1`–`F24`/`Space`/`Tab`/`Enter`/`Backspace`/`Delete`/`Insert`/`Home`/`End`/`PageUp`/`PageDown`/`ArrowUp/Down/Left/Right`，修饰符 `Ctrl/Alt/Shift/Win` 至少一个、组合不得重复、总长 ≤ 64。
+> 快捷键的**格式/修饰符/冲突不在 JSON Schema 内校验**（JSON Schema 正则表达力不足，`$ACCELERATOR` 式占位会匹配字面量、导致校验器误判；P2-11），统一由 §8.4 语义校验负责；Schema 只限制类型与长度（1–64）。允许的键名集合 = `[A-Z0-9]`/`F1`–`F24`/`Space`/`Tab`/`Enter`/`Backspace`/`Delete`/`Insert`/`Home`/`End`/`PageUp`/`PageDown`/`ArrowUp/Down/Left/Right`，修饰符 `Ctrl/Alt/Shift/Win` 至少一个、组合不得重复。
 
 ---
 
@@ -451,11 +453,24 @@
 
 `spike/` 或测试夹具维护迁移样本：v1 默认值、旧版缺字段、未知字段、损坏 JSON、未来版本、非法枚举。CI 用 JSON Schema 与迁移函数做表驱动测试（见 07-test-strategy）。
 
+### 10.4 测试与开发注入（环境变量，**非设置 JSON**，P0-03）
+
+| 变量 | 生效条件 | 作用 | 生产行为 |
+|---|---|---|---|
+| `CLARIFY_ENV` | **仅 debug/test 构建**；值 `dev`/`test` | 标记开发/测试环境；启用 `CLARIFY_DB_PATH` 与调试维护命令 | 未设置 = 生产；release 构建**忽略**该变量 |
+| `CLARIFY_DB_PATH` | 必须 `CLARIFY_ENV=dev\|test` **且** debug/test 构建；绝对路径（含文件名） | 覆盖 DB 文件路径，指向临时目录/测试夹具，使测试**完全隔离生产库**（07-test-strategy TQ-3） | 忽略；若检测到该变量则写一条 warn 日志（不读取、不创建文件） |
+
+- **DB 路径唯一事实源**：`04-architecture.md` §6.1 = `%LOCALAPPDATA%\app.clarify.desktop\clarify.db`；本文不重复定义。
+- 测试注入优先级：① Rust 单测直接构造 `AppState` 并注入临时目录 DB 路径（不依赖环境变量）；② 集成/E2E 进程用 `CLARIFY_ENV=test` + `CLARIFY_DB_PATH`；③ DB 路径**不进入** `settings` JSON，也不接受前端指定。
+- 时间测试：注入 `FakeClock`（04 §3.5）；需要立即触发一轮 24 h 清理/周期重置时调用**仅 debug 注册**的 `maintenance.run{now_override?}`（tauri-ipc §4.18）。
+- 安全要求：release 构建必须不注册调试命令、忽略注入变量；CI 增加守卫（08-engineering §3.2/§6）。
+
 ---
 
 ## 11. 无备份 / 无导出（配置角度的明确承诺）
 
 - 设置 JSON 与凭据**不提供导出/导入/云同步**；`settings.*` 命令中没有 export/import。
+- 数据库路径/文件名的**唯一事实源是 `04-architecture.md` §6.1**（`%LOCALAPPDATA%\app.clarify.desktop\clarify.db`）；本文只引用、不另定义；测试/开发注入见 §10.4。
 - 设置随本机 SQLite 数据库存在；数据库损坏/被删除即丢失（与 00-decisions §7 一致）。
 - 卸载是否保留设置（`%LOCALAPPDATA%` 用户数据）由 `11-release-ops.md` 决定；v1 默认保留，安装包不主动清除用户数据。
 - 重置设置 ≠ 清空数据：`settings.reset` 只重置设置与视图偏好，**不删除事项、不删除凭据**；"恢复出厂"不在 v1 设置内。
@@ -484,3 +499,4 @@
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：设置 JSON Schema、默认值、A/B 视图与时间范围、悬浮窗几何/样式、快捷键、凭据管理器、迁移与校验、无备份承诺 | tech-writer |
+| v0.2 | 2026-11-01 | 红队修复：新增 §10.4 测试/开发注入（`CLARIFY_ENV`/`CLARIFY_DB_PATH`，仅 dev/test、生产忽略；DB 路径引用 04 §6.1）；§0/§11 同步；§2 快捷键去掉不可执行 `$ACCELERATOR` pattern（P2-11） | tech-writer |

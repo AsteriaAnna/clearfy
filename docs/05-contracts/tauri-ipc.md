@@ -1,8 +1,9 @@
 # Tauri IPC 契约（tauri-ipc）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.1（初稿，待评审冻结）
+- 版本：v0.2（红队修复稿；v0.1 初稿）
 - 更新日期：2026-11-01
+- 本次修订（v0.2）：P0-03 新增 `maintenance.run`（仅 debug 注册、能力白名单仅 main）与额度重置权威说明；P1-05 客户端只展示网关 `X-Quota-Reset-At`；P2-02 补 `capture_id`↔`batch_id` 映射。修订章节：§0、§1.4、§3、§4.5、§4.16、§4.18、§6、§9、§12。
 - 状态：**v1 冻结候选**。领域字段与语义的**唯一事实源是 `03-domain-model.md`**；错误码见 `05-contracts/error-taxonomy.md`；设置结构见 `05-contracts/config-schema.md`；AI 输出见 `05-contracts/ai-json.md`；网关 HTTP 见 `05-contracts/gateway-api.md`。
 - 关联：`04-architecture.md` §3/§4/§5
 
@@ -157,6 +158,7 @@ type ViewQuery =
 - `activation`：`none` \| `active` \| `invalid` \| `revoked` \| `unknown`。
 - `notice`：非错误提示（如"官方额度今日用完，当前用规则模式"），前端以轻提示呈现，可为 null。
 - 该结构仅**运行时**，不写入设置 JSON。
+- `quota.reset_at`：**来源仅为网关响应头 `X-Quota-Reset-At`**（网关按北京时间 00:00 判定）；客户端只展示，不按本地时区自行推算/倒计时到本地零点；离线时展示上次已知值并把 `network` 标为 `unknown`（P1-05）。
 
 ### 1.5 其他
 
@@ -220,6 +222,7 @@ type ViewQuery =
 | | `credentials.test` | `credentials_test` | 否 | main | 测试连通（官方 health / BYOK 轻请求） |
 | 状态 | `service.status` | `service_status` | 是 | main / widget | §1.4 |
 | | `quota.refresh` | `quota_refresh` | 是 | main / widget | 主动探测（health 带鉴权） |
+| 维护（仅 debug） | `maintenance.run` | `maintenance_run` | 是 | main（仅 debug 构建注册） | 测试/联调：注入 now 触发一轮 24 h 清理 + 计数周期重置（§4.18） |
 | 窗口 | `window.show_main` | `window_show_main` | 是 | main / widget | 参数 `page: "main"\|"settings"` |
 | | `window.hide_main` | `window_hide_main` | 是 | main | |
 | | `app.quit` | `app_quit` | 是 | main | 设置页退出入口（无托盘） |
@@ -316,6 +319,7 @@ type ViewQuery =
 ```
 
 - 同一 `capture_id` 重复调用：返回首次创建的事件（不再调用 AI、不重复创建）。
+- `batch_id` 与捕捉会话的 `capture_id` **同值映射**：客户端把 `capture_id` 作为网关 HTTP 信封的 `batch_id` 发送（仅网关配额去重/分组用，不落库，见 `03-domain-model.md` §1.1、gateway-api §1/§4）。
 - `degraded=true` 且 `mode_used="rules"` 时，前端轻提示"已用本地规则安排"（不阻塞、不弹窗）。
 - 事件创建后由后端逐个 `emit("event.created", {event})`；前端收到后刷新当前视图。
 - 错误：`CLR-E4001/4002/4003/4004/4005/4006/5002`；解析失败仍会走规则兜底（`degraded`），只有"输入非法/库失败/无法兜底"才抛错。
@@ -427,6 +431,7 @@ type ViewQuery =
 - `service.status`：`{}` → `ServiceStatus`（读本地缓存 + 最近一次网关响应头；不主动联网）。
 - `quota.refresh`：`{}` → `ServiceStatus`；官方已配置时调用 `GET /v1/health`（带鉴权，零成本），更新配额/预算并 `emit("quota.updated")`。
 - 频率限制：前端 `quota.refresh` 最短间隔 30 s（后端节流，超频返回上次结果，不报错）。
+- 额度重置时间只取网关响应头 `X-Quota-Reset-At`（网关按北京时间 00:00 判定，权威）；客户端不按本地时区推算；刷新失败时保留上次值并把 `network` 置 `unknown`（P1-05）。
 
 ### 4.17 窗口/悬浮窗命令
 
@@ -438,6 +443,19 @@ type ViewQuery =
 - `widget.set_geometry`：`{x,y,width,height,monitor_id?}` → `WidgetState`；越界自动夹到工作区（domain 无规则，见 config-schema §7）；宽高夹在 `[260×140, 480×720]`（占位默认，待视觉细化）。
 - `widget.set_style`：`{opacity?, material?, reduced_transparency?}` → `WidgetState`；透明度取值 `0.75/0.9/1.0`（档位，见 config-schema §4.3）；`material` 为 `auto|acrylic|mica|solid`；材质不可用 → 自动降级并在 `material_effective` 反映（不报错，`notice` 提示一次）。置顶为产品硬要求，v1 恒为 true，不开放修改。
 - `widget.reset_geometry` → `WidgetState`（主屏工作区右下角，24 px 边距；待视觉细化）。
+
+### 4.18 `maintenance.run`（测试维护命令，仅 debug 构建注册）
+
+```json
+{ "now_override": "2026-11-03T09:00:00+08:00" }
+```
+
+- 用途：测试/本地联调**手动触发一轮维护**——24 h 物理清理 + 计数周期重置 + 维护时间戳，用于验证 24 h 边界、跨日/跨周，**不需要真实等待**（配合 `04-architecture.md` §3.5 的 `FakeClock`；对应 `07-test-strategy.md` §3.4 TQ-1/TQ-2）。
+- **仅 debug 构建注册**：release 构建不注册该命令（调用表现为未知命令）；能力白名单仅 `main`（widget 不可调用）。
+- `now_override`：可选，RFC3339 带偏移；缺省使用注入 `Clock.now_utc()`；仅此调试入口接受外部 now（生产逻辑不接受覆盖）。
+- 返回：`{ "ran_at": "2026-11-03T01:00:00Z", "purged_events": 2, "purged_completions": 3, "count_reset": 1 }`；幂等，可重复调用。
+- 错误：通用错误（`CLR-E5002` 等）；release 下命令不存在，前端不得依赖。
+- 与生产路径关系：生产由启动、每 60 分钟、系统唤醒自动执行**同一实现**；`maintenance.run` 只是手动入口，不在 UI 暴露。
 
 ---
 
@@ -478,6 +496,7 @@ type ViewQuery =
 | `credentials.*` | `CLR-E1002/1003/1004/1007` | 设置页提示；不自动重试（除 test） |
 | `window/widget.*` | `CLR-E6002/6005` | 轻提示；悬浮窗失败降级为主窗可用 |
 | `quota.refresh` | `CLR-E2001/2004` | 保留上次状态，`network="unknown"` |
+| `maintenance.run`（仅 debug） | `CLR-E0001/5002` | 仅测试使用；失败写日志，不提示用户 |
 
 完整错误码、中文文案、可重试性与降级动作 → `05-contracts/error-taxonomy.md`。
 
@@ -533,10 +552,12 @@ idle
 | `view.query`、`event.complete`、`event.count_increment`、`service.status`、`quota.refresh` | ✅ | ✅ |
 | `window.show_main`、`widget.get_state` | ✅ | ✅ |
 | `capture.*`、`ai.*`、`event.get/update/delete/create/restore`、`settings.*`、`credentials.*`、`window.hide_main`、`app.quit`、`widget.show/hide/toggle/set_*` | ✅ | ❌ |
+| `maintenance.run`（仅 debug 构建注册） | ✅（仅 debug） | ❌ |
 | 事件 `event.*`、`quota.updated`、`settings.changed` | ✅ | ✅（widget 仅响应其中样式/视图相关变化） |
 | 事件 `capture.*`、`ai.status`、`app.error` | ✅ | ❌ |
 
 - 白名单在 Tauri capabilities 配置中按窗口 label 声明；新增命令必须同时更新本表与 capabilities，否则主窗也不可用。
+- `maintenance.run` 在 release 构建**不注册**、capabilities 仅 debug 包声明；测试通过它 + `FakeClock` 演示 24 h 边界（04 §3.5）。
 - 悬浮窗的**创建入口**（语音/文字）按 00-decisions §10-11 未定，v1 默认不在 widget 开捕捉；上表随之保持 `capture.*` 不可用（若后续确认，再开放并加录音权限说明）。
 
 ---
@@ -570,3 +591,4 @@ idle
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：公共类型（Event/Occurrence/ViewResult/ServiceStatus）、命令清单与详情、事件推送、错误映射、状态机、重试策略、能力白名单 | tech-writer |
+| v0.2 | 2026-11-01 | 红队修复：新增 §4.18 `maintenance.run`（仅 debug、main 白名单，触发 24h 清理/周期重置）；§1.4/§4.16 明确额度重置权威=网关、客户端只展示 `X-Quota-Reset-At`；§4.5 补 `capture_id`↔`batch_id` 映射；§6/§9 同步 | tech-writer |

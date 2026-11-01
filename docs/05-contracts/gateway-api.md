@@ -1,8 +1,9 @@
 # 官方网关 API 契约（gateway-api）
 
 - Owner：tech-writer（技术与工程文档）
-- 版本：v0.1（初稿，待评审冻结）
+- 版本：v0.2（红队修复稿；v0.1 初稿）
 - 更新日期：2026-11-01
+- 本次修订（v0.2）：P1-05 额度重置权威=网关北京时间 00:00、客户端只展示 `X-Quota-Reset-At`（§1.2/§6.4）；P1-06 录音上限统一 15 s（§3.1）；P1-09 用量保留期与 11 对齐（§7）；§6.1 补 200 单位口径。修订章节：§1.2、§3.1、§6.1、§6.4、§7、§8、§12。
 - 状态：**v1 冻结候选**。部署形态与配额策略见 ADR-0001/0002、`10-risks-decisions.md` D12/D17/D20。
 - 相关：`04-architecture.md` §5.6、`05-contracts/tauri-ipc.md`（客户端侧调用与重试）、`05-contracts/ai-json.md`（`actions[]` 与输入字段的唯一事实源）、`03-domain-model.md`（落库字段）、`05-contracts/error-taxonomy.md`（客户端错误码映射）、`docs/ops/official-ai-gateway-setup.md`（部署步骤）
 
@@ -56,7 +57,7 @@ API 版本：路径固定 `/v1`。`/v1` 内**不删字段、不改语义**；破
 | `X-Quota-Limit` | `200` | 每设备每日额度（单位见 §6.1） |
 | `X-Quota-Used` | `37` | 本设备今日已用 |
 | `X-Quota-Remaining` | `163` | 剩余 |
-| `X-Quota-Reset-At` | `2026-11-02T00:00:00+08:00` | 额度重置时间（北京时间 00:00） |
+| `X-Quota-Reset-At` | `2026-11-02T00:00:00+08:00` | 额度重置时间（**网关按北京时间 00:00 判定**；客户端只展示、不自行推算，P1-05） |
 | `X-Budget-State` | `ok` \| `warn` \| `exhausted` | 月预算状态；`warn` = ≥80%，`exhausted` = ≥100% |
 | `X-Budget-Used-Cny` | `36.42` | 当月已用（估算，两位小数） |
 | `X-Budget-Limit-Cny` | `200.00` | 当月预算 |
@@ -142,8 +143,8 @@ Content-Length: 480044
 |---|---|---|
 | 容器 | RIFF/WAVE，PCM s16le | `400 AUDIO_INVALID_FORMAT` |
 | 采样率/声道 | 16 000 Hz / 单声道 | `400 AUDIO_INVALID_FORMAT` |
-| 时长 | 0.3 s ≤ d ≤ 20 s（客户端上限 15 s） | `400 AUDIO_INVALID_FORMAT` |
-| 体积 | ≤ 2 MB（20 s 16 kHz 单声道 s16le ≈ 640 KB，余量充足） | `413 AUDIO_TOO_LARGE` |
+| 时长 | 0.3 s ≤ d ≤ **15 s**（客户端与网关**同一上限**，P1-06） | `400 AUDIO_INVALID_FORMAT` |
+| 体积 | ≤ 2 MB（15 s 16 kHz 单声道 s16le ≈ 480 KB，余量充足） | `413 AUDIO_TOO_LARGE` |
 | 内容 | 语种 v1 固定中文（可中英混说） | 无语言参数 |
 
 ### 3.2 响应 200
@@ -294,7 +295,7 @@ Content-Type: application/json; charset=utf-8
 ### 6.1 单位
 
 - **额度单位 = 一次捕捉**：同一 `batch_id` 的 `/v1/transcribe` + `/v1/parse` 合并计 **1 单位**；纯文字创建的 `/v1/parse` 计 1 单位。缺少 `batch_id` 的请求（直连调试）每请求计 1 单位。
-- 上限：**每设备 200 单位/自然日**（北京时间 UTC+8 00:00 重置）；≈ 每天 200 次语音捕捉。
+- 上限：**每设备 200 单位/自然日**（北京时间 UTC+8 00:00 重置）；≈ 每天 200 次语音捕捉。PRD F11 写的"200 次调用"按此口径 = 200 单位（1 单位 = 1 次捕捉，转写+解析合并计 1；P2-03 用词统一）。
 - 计数对象：`device_hash = HMAC-SHA256(GATEWAY_SECRET, device_id)` 取前 16 位 Base32；不存原始 device id。
 - 只有**实际转发到上游**的请求计入（401/400/413 不计；上游失败的 5xx **计**，防止失败重试绕过额度）；同一 `batch_id` 的重试不计第二次。
 
@@ -335,6 +336,7 @@ Content-Type: application/json; charset=utf-8
 `X-Quota-Reset-At` = 下一个北京时间 00:00（带 +08:00 偏移）。42000 秒窗口内 `Retry-After = reset_at - now`。
 
 - **重置权威时钟是网关（北京时区 UTC+8 的 00:00）**，不以客户端时区/本地日期为准（防止改时区刷额度）；测试用可注入时钟验证跨天（`07-test-strategy.md` GW-005）。
+- **客户端契约**：只展示本响应头 / `ServiceStatus.quota.reset_at` 的值，不按本地时区自行推算重置时间或倒计时到本地零点（P1-05；tauri-ipc §1.4/§4.16）。
 
 ---
 
@@ -354,7 +356,7 @@ Content-Type: application/json; charset=utf-8
 2. FC 访问日志：不把敏感信息放 URL/query（本 API 不用 query 传参）；确认 FC 日志不记录请求体（默认不记录，部署时复核）。
 3. 错误排查仅凭 `request_id` 关联日志字段；**不保留任何可重放内容**。
 4. 用量对象写入 OSS 前再过一次白名单序列化（字段固定 JSON Schema）。
-5. 日志保留：FC 日志 7 天（默认）；OSS 用量 180 天；预算聚合 24 个月。
+5. 保留期（与 `11-release-ops.md` §4.1/§7.1 数据保留矩阵**对齐**，P1-09）：FC 日志 7 天（默认）；**OSS 用量元数据 180 天**；**预算聚合 24 个月**（OSS 生命周期规则配置，部署时核对；缩短需同时改 11 的隐私告知）。
 6. 作者本地开发/联调同样遵守（`spike/` 与 `gateway/` 的测试不得使用真实用户音频/正文；测试数据自带假数据）。
 
 ---
@@ -371,7 +373,7 @@ Content-Type: application/json; charset=utf-8
 | 429 `QUOTA_DAILY_EXCEEDED` | **不重试**；当日官方停用；规则/BYOK 兜底；下次 00:00 自动恢复（无需手动操作） |
 | 429 `BUDGET_EXHAUSTED` | **不重试**；官方停用至作者调整预算；规则/BYOK 兜底 |
 | 400 | 不重试；记 `CLR-E2010`（属 bug，用户提示"刚才没成功，请再试一次"） |
-| 超时（客户端 8 s/6 s） | 视为网络失败，重试 1 次 → 降级 |
+| 超时（客户端转写 8 s / 解析 12 s） | 视为网络失败，重试 1 次 → 降级 |
 
 重试不得叠加（转写与解析各自最多 1 次），避免费用与延迟翻倍；`batch_id` 保证配额不重复计。
 
@@ -453,3 +455,4 @@ Content-Type: application/json; charset=utf-8
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
 | v0.1 | 2026-11-01 | 首版：/v1/health、/v1/transcribe、/v1/parse 契约；头/配额/预算/日志/部署/错误码 | tech-writer |
+| v0.2 | 2026-11-01 | 红队修复：录音上限统一 15 s（P1-06）；额度重置权威与客户端只展示 `X-Quota-Reset-At`（P1-05）；用量保留期与 11 对齐（180 天/24 个月，P1-09）；200 单位口径补注（P2-03） | tech-writer |
