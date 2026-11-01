@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clarify · 悬浮窗实验室 v0.4</title>
+<!--
+  Clarify 悬浮窗实验室 v0.4（单文件、离线、无外部图片/字体/CDN）
+  用途：对比 A 今日议程 / B 清单 × 三主题（雾粉 / 鼠尾草绿 / 雾蓝·石墨），
+        标注尺寸与比例，供用户挑选；截图模式 ?shot=A|B&theme=pink|sage|blue（2x 特写用）。
+  说明：本页非产品 UI；点「＋ 说一句」在正式原型中唤起捕捉条（Q11 建议入口，待产品确认）。
+-->
+<style>
+/* ============================================================ tokens */
+:root{
+  color-scheme:light;
+  --font-sans:"Segoe UI Variable Text","Segoe UI Variable Display","Segoe UI","Microsoft YaHei UI","Microsoft YaHei","PingFang SC",system-ui,-apple-system,sans-serif;
+  --font-serif:Georgia,"Times New Roman",Cambria,"Songti SC","SimSun",serif;
+  --font-num:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI",sans-serif;
+  --paper:#FAF9F6; --card:#FFFFFF;
+  --pearl:#E9E8E5; --line-2:#DEDBD4;
+  --ink-1:#333532; --ink-2:#5C5E57; --ink-3:#6E7068; --ink-decor:#A7A69F;
+  --surface-warm:#F4F1EB;
+  --w-shadow:0 1px 2px rgba(120,108,92,.10),0 16px 34px -16px rgba(110,98,82,.34);
+  --w-shadow-hover:0 1px 2px rgba(120,108,92,.10),0 22px 42px -18px rgba(110,98,82,.40);
+  --r-widget:18px;
+  --accent-soft:#E7D8DC; --accent-wash:#F6EFF0; --accent-ink:#8E5B68; --accent-tint:#FBF7F8;
+  --chrome-bg:#2C2A27; --chrome-text:#E9E3D9; --chrome-muted:#9B9388;
+}
+.theme-pink{--accent-soft:#E7D8DC;--accent-wash:#F6EFF0;--accent-ink:#8E5B68;--accent-tint:#FBF7F8}
+.theme-sage{--accent-soft:#C8D1C7;--accent-wash:#F1F4F0;--accent-ink:#526B56;--accent-tint:#F8FAF7}
+.theme-blue{--accent-soft:#AFC0C8;--accent-wash:#EDF1F3;--accent-ink:#5B6B73;--accent-tint:#F6F8F9}
+
+/* ============================================================ base / page */
+*,*::before,*::after{box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  margin:0;background:
+    radial-gradient(1100px 760px at 16% 4%,rgba(255,255,255,.62),rgba(255,255,255,0) 62%),
+    radial-gradient(900px 700px at 92% 94%,rgba(233,219,206,.55),rgba(233,219,206,0) 64%),
+    linear-gradient(155deg,#EFEAE1 0%,#EAE4DA 56%,#E4DDD1 100%);
+  color:var(--ink-1);font-family:var(--font-sans);font-size:14px;line-height:22px;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+kbd{font-family:var(--font-sans);font-size:10px;padding:1px 6px;border-radius:6px;background:var(--surface-warm);box-shadow:0 0 0 1px var(--pearl),inset 0 1px 0 rgba(255,255,255,.9)}
+.eyebrow{margin:0;font-size:10px;line-height:14px;font-weight:600;letter-spacing:.2em;color:var(--ink-3);text-transform:uppercase}
+.serif{font-family:var(--font-serif)}
+
+/* 桌面纹理（CSS 自绘 + 内联 SVG 噪点，无外部资源） */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  opacity:.045;mix-blend-mode:multiply;
+}
+.page{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:56px 32px 72px}
+
+/* header */
+.lab-head{margin-bottom:44px}
+.lab-head h1{
+  margin:14px 0 0;font-family:var(--font-serif);font-weight:400;
+  font-size:44px;line-height:1.05;letter-spacing:-.01em;color:var(--ink-1);
+}
+.lab-head h1 em{font-style:italic;color:var(--ink-2)}
+.lab-head h1 .ver{font-family:var(--font-sans);font-size:12px;letter-spacing:.18em;color:var(--ink-3);vertical-align:middle;margin-left:14px}
+.intro{max-width:720px;margin:18px 0 0;font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+.intro + .intro{margin-top:12px}
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-top:22px;font-size:11px;color:var(--ink-3)}
+.legend .item{display:flex;align-items:center;gap:7px}
+.tdot{width:10px;height:10px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(120,108,92,.14)}
+.tdot.pink{background:#E7D8DC}.tdot.sage{background:#C8D1C7}.tdot.blue{background:#AFC0C8}
+.legend .sep{width:1px;height:14px;background:var(--pearl)}
+.legend b{color:var(--ink-2);font-weight:600}
+
+/* sections */
+.lab-section{margin-bottom:52px}
+.section-head{display:flex;align-items:flex-end;gap:18px;margin-bottom:20px}
+.section-head h2{margin:6px 0 0;font-family:var(--font-serif);font-weight:400;font-size:30px;line-height:1.1;color:var(--ink-1)}
+.section-head h2 em{font-style:italic;font-family:var(--font-sans);font-size:11px;letter-spacing:.20em;color:var(--ink-3);vertical-align:middle;margin-left:10px}
+.section-head .tag{
+  margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  height:24px;padding:0 10px;border-radius:999px;
+  font-size:10.5px;letter-spacing:.06em;color:var(--ink-2);
+  background:rgba(255,255,255,.66);box-shadow:inset 0 0 0 1px var(--pearl),inset 0 1px 0 rgba(255,255,255,.9);
+}
+.section-head .tag::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent-soft);box-shadow:0 0 0 1px rgba(120,108,92,.12)}
+
+/* lab grid */
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.lab-cell{padding:22px 20px 16px;border-radius:24px;background:rgba(255,255,255,.34);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),0 1px 2px rgba(120,108,92,.04)}
+.lab-stage{display:flex;align-items:center;justify-content:center;min-height:320px;padding:20px 0 8px}
+.lab-cell--b .lab-stage{min-height:360px;padding-top:34px}
+.lab-caption{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:10px;font-size:10.5px;letter-spacing:.10em;text-transform:uppercase;color:var(--ink-3)}
+.lab-caption b{color:var(--ink-2);font-weight:600}
+.lab-caption .size{white-space:nowrap;font-variant-numeric:tabular-nums}
+.spec-list{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px 22px;font-size:11px;color:var(--ink-3)}
+.spec-list li{display:flex;align-items:center;gap:7px}
+.spec-list li::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--accent-soft)}
+
+/* 设计说明 */
+.notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.note-card{background:rgba(255,255,255,.62);border-radius:20px;padding:24px 26px;box-shadow:inset 0 0 0 1px var(--pearl),inset 0 1px 0 rgba(255,255,255,.95),0 1px 2px rgba(120,108,92,.04)}
+.note-card h3{margin:8px 0 10px;font-family:var(--font-serif);font-weight:400;font-size:20px;line-height:1.3;color:var(--ink-1)}
+.note-card p{margin:0;font-size:12.5px;line-height:1.85;color:var(--ink-2)}
+.note-card p + p{margin-top:10px}
+.note-card .eyebrow{margin-bottom:0}
+
+/* footer */
+.lab-foot{margin-top:36px;padding-top:18px;border-top:1px solid rgba(120,108,92,.16);font-size:10.5px;letter-spacing:.04em;color:var(--ink-3);display:flex;gap:16px;flex-wrap:wrap}
+.lab-foot a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(120,108,92,.24)}
+
+/* ============================================================ widget v0.4 */
+.widget{
+  position:relative;z-index:2;display:flex;flex-direction:column;
+  width:300px;height:220px;border-radius:var(--r-widget);
+  background:rgba(253,252,249,.97);
+  box-shadow:var(--w-shadow),0 0 0 1px var(--pearl),inset 0 1px 0 rgba(255,255,255,.92);
+  color:var(--ink-1);user-select:none;
+  transition:box-shadow 200ms cubic-bezier(.22,.68,.36,1);
+}
+.widget:hover{box-shadow:var(--w-shadow-hover),0 0 0 1px var(--pearl),inset 0 1px 0 rgba(255,255,255,.95)}
+.widget.dragging{box-shadow:0 2px 6px rgba(120,108,92,.12),0 26px 50px -20px rgba(110,98,82,.46),0 0 0 1px var(--line-2)}
+.widget[data-widget-template="list"]{height:260px}
+.widget *{box-sizing:border-box}
+
+/* 拖拽把手（hover 才出现） */
+.w-grip{
+  position:absolute;left:7px;top:50%;transform:translateY(-50%);
+  width:8px;height:20px;display:grid;grid-template-columns:repeat(2,2px);gap:2px;align-content:center;
+  opacity:0;transition:opacity 160ms cubic-bezier(.22,.68,.36,1);pointer-events:none;
+}
+.w-grip i{width:2px;height:2px;border-radius:50%;background:var(--ink-decor)}
+.widget:hover .w-grip,.widget.force-hover .w-grip{opacity:1}
+
+/* header */
+.w-header{flex:0 0 42px;height:42px;display:flex;align-items:center;gap:8px;padding:0 10px 0 18px;cursor:move;position:relative}
+.w-head-left{display:flex;align-items:baseline;gap:8px;min-width:0}
+.w-eyebrow{font-size:10px;line-height:14px;font-weight:600;letter-spacing:.16em;color:var(--ink-3)}
+.w-date{display:flex;align-items:baseline;gap:5px;white-space:nowrap}
+.w-date .d{font-family:var(--font-serif);font-size:13.5px;line-height:16px;color:var(--ink-1);letter-spacing:.02em}
+.w-date .wd{font-size:10px;line-height:14px;letter-spacing:.04em;color:var(--ink-3)}
+.w-head-right{margin-left:auto;display:flex;align-items:center;gap:5px}
+.w-progress{display:flex;align-items:center;gap:5px;color:var(--ink-2)}
+.w-progress svg{width:15px;height:15px;display:block}
+.w-progress .track{fill:none;stroke:var(--pearl);stroke-width:1.5}
+.w-progress .arc{fill:none;stroke:var(--accent-ink);stroke-width:1.75;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%}
+.w-progress .n{font-size:10.5px;line-height:14px;letter-spacing:.02em;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.w-home{
+  width:24px;height:24px;flex:0 0 24px;border-radius:7px;display:grid;place-items:center;
+  color:var(--ink-3);transition:background-color 120ms,color 120ms;
+}
+.w-home svg{width:14px;height:14px}
+.w-home:hover{background:rgba(233,232,229,.55);color:var(--ink-1)}
+.w-seg{display:inline-flex;align-items:center;gap:1px;padding:2px;border-radius:8px;background:rgba(244,241,235,.9);box-shadow:inset 0 0 0 1px rgba(233,232,229,.9)}
+.w-seg button{height:20px;padding:0 8px;border-radius:6px;font-size:10px;line-height:20px;color:var(--ink-3);transition:background-color 120ms,color 120ms}
+.w-seg button.active{background:var(--card);color:var(--ink-1);font-weight:600;box-shadow:0 1px 2px rgba(120,108,92,.10)}
+
+/* body / rows */
+.w-rows{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;padding:4px 8px}
+.w-rows::-webkit-scrollbar{width:4px}
+.w-rows::-webkit-scrollbar-thumb{background:rgba(120,108,92,.18);border-radius:4px}
+.w-rows--list{gap:4px;padding:4px 8px}
+.w-row{
+  display:flex;align-items:center;gap:10px;height:44px;padding:0 6px;margin:0 -6px;
+  border-radius:10px;cursor:pointer;text-align:left;flex:0 0 auto;
+  transition:background-color 120ms cubic-bezier(.22,.68,.36,1),opacity 170ms ease,transform 170ms ease;
+}
+.w-row:hover,.w-row:focus-visible{background:rgba(233,232,229,.45)}
+.w-row:focus-visible{outline:none;box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent-ink)}
+.w-time{width:46px;flex:0 0 46px;text-align:right;font-size:11px;line-height:15px;color:var(--ink-3);font-variant-numeric:tabular-nums;letter-spacing:.01em;white-space:nowrap}
+.w-check{
+  width:18px;height:18px;flex:0 0 18px;border-radius:50%;position:relative;
+  border:1.25px solid var(--line-2);background:rgba(255,255,255,.65);
+  display:grid;place-items:center;transition:border-color 160ms,background-color 160ms;
+}
+.w-check::after{
+  content:"";width:8px;height:4px;
+  border-left:1.5px solid var(--accent-soft);border-bottom:1.5px solid var(--accent-soft);
+  transform:rotate(-45deg) translateY(-1px) scale(0);opacity:0;
+  transition:transform 160ms cubic-bezier(.22,.68,.36,1),opacity 160ms;
+}
+.w-title{flex:1;min-width:0;font-size:13px;line-height:18px;font-weight:500;letter-spacing:.01em;color:var(--ink-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w-meta{flex:0 0 auto;margin-left:auto;padding-left:8px;font-size:10.5px;line-height:15px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.w-chip{
+  flex:0 0 auto;margin-left:auto;display:inline-flex;align-items:center;height:18px;padding:0 6px;
+  border-radius:6px;background:rgba(244,241,235,.95);box-shadow:inset 0 0 0 1px rgba(233,232,229,.95);
+  font-size:10px;line-height:18px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* 仅当前/下一项用一点强调色 */
+.w-row.is-next .w-check{border-color:var(--accent-ink)}
+.w-row.is-next .w-time{color:var(--accent-ink)}
+/* 完成动画 ≤200ms */
+.w-row.is-completing .w-check{background:var(--accent-ink);border-color:var(--accent-ink)}
+.w-row.is-completing .w-check::after{opacity:1;transform:rotate(-45deg) translateY(-1px) scale(1)}
+.w-row.is-completing .w-title{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1px}
+.w-row.is-completing{opacity:0;transform:translateX(4px)}
+.w-row.is-restoring{opacity:.4}
+
+/* empty */
+.w-empty{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:3px;padding:0 12px}
+.w-empty .e-main{margin:0;font-size:12px;line-height:18px;color:var(--ink-2)}
+.w-empty .e-sub{margin:0;font-size:10.5px;line-height:15px;color:var(--ink-3)}
+
+/* footer */
+.w-footer{flex:0 0 38px;height:38px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;border-top:1px solid rgba(233,232,229,.9)}
+.w-create{
+  display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:8px;
+  font-size:11.5px;line-height:26px;color:var(--ink-2);
+  transition:background-color 120ms,color 120ms;
+}
+.w-create .plus{font-size:13px;line-height:1;color:var(--ink-3);transition:color 120ms}
+.w-create:hover{background:rgba(233,232,229,.5);color:var(--ink-1)}
+.w-create:hover .plus{color:var(--accent-ink)}
+.w-more{
+  display:flex;align-items:center;gap:4px;height:26px;margin-left:auto;padding:0 7px;border-radius:8px;
+  font-size:11px;line-height:26px;color:var(--ink-3);white-space:nowrap;
+  transition:background-color 120ms,color 120ms;
+}
+.w-more .chev{font-size:12px;line-height:1;transform:translateY(-.5px)}
+.w-more:hover{background:rgba(233,232,229,.5);color:var(--ink-1)}
+.w-resize{
+  position:absolute;right:3px;bottom:3px;width:18px;height:18px;z-index:4;display:grid;place-items:center;
+  color:var(--ink-decor);opacity:0;cursor:nwse-resize;border-radius:6px;
+  transition:opacity 160ms,color 160ms,background-color 120ms;
+}
+.w-resize::after{content:"";width:8px;height:8px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;border-radius:0 0 3px 0;transform:translate(1px,1px)}
+.widget:hover .w-resize,.widget.force-hover .w-resize{opacity:.9;color:var(--ink-2)}
+.w-resize:hover{background:rgba(233,232,229,.5)}
+
+/* B 模板排版尺寸 */
+.widget[data-widget-template="list"] .w-header{flex-basis:44px;height:44px}
+.widget[data-widget-template="list"] .w-footer{flex-basis:34px;height:34px}
+.widget[data-widget-template="list"] .w-row{height:40px}
+
+/* ============================================================ 截图模式 */
+body.shot{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#EFE9DF}`nbody.shot::before{display:none}
+body.shot .page,body.shot .lab-head,body.shot .lab-section,body.shot .lab-foot{display:none}
+body.shot #shotStage{display:flex;align-items:center;justify-content:center;width:100%;padding:48px}
+#shotStage{display:none}
+body.shot #shotStage{display:flex}
+
+/* responsive (lab overview) */
+@media (max-width:980px){
+  .grid{grid-template-columns:1fr}
+  .notes{grid-template-columns:1fr}
+  .lab-head h1{font-size:34px}
+  .lab-stage{min-height:0;padding:26px 0 8px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="lab-head">
+    <p class="eyebrow">CLARIFY · WIDGET LAB</p>
+    <h1>悬浮窗特写 <em>—</em><span class="ver">v0.4 · 2026.11</span></h1>
+    <p class="intro">这版把悬浮窗当<b>一张日程卡片</b>，而不是「迷你主界面」。A 今日议程只回答「今天接下来做什么」：主体最多 3 条有时间事项，时间列右对齐，无时间/计数收进底部「还有 N 件」。B 清单只回答「今天 / 全部还剩什么」：最多 4 条，超出以 +N 收口。固定横比例让它在桌面上是卡片，不是面板。</p>
+    <p class="intro">视觉上做减法：96–97% 暖白、1px 珍珠灰、两层柔和阴影，<b>去掉纸纹与重模糊</b>，让边缘与文字更脆；时间列 46px 右对齐 + tabular numerals、18px 细环、13/500 标题构成清晰层级；<b>只有「当前 / 下一项」用一点强调色</b>；拖拽把手与 resize 角只在 hover 时出现。点「＋ 说一句」在正式原型中唤起捕捉条（Q11 建议入口，最终以产品确认为准）。</p>
+    <div class="legend">
+      <span class="item"><span class="tdot pink"></span><b>雾粉</b> MIST PINK</span>
+      <span class="item"><span class="tdot sage"></span><b>鼠尾草绿</b> SAGE</span>
+      <span class="item"><span class="tdot blue"></span><b>雾蓝 · 石墨</b> MIST BLUE</span>
+      <span class="sep"></span>
+      <span class="item">A 今日议程 <b>300×220</b> · 3:2</span>
+      <span class="item">B 清单 <b>300×260</b> · 7:6</span>
+      <span class="sep"></span>
+      <span class="item">圆角 18 · 行高 44 / 40 · 深色 v1 不做</span>`n      <span class="sep"></span>`n      <span class="item">默认：<b>A 今日议程 + 雾粉</b></span>
+    </div>
+  </header>
+
+  <section class="lab-section">
+    <div class="section-head">
+      <div><p class="eyebrow">CONCEPT A · AGENDA</p><h2>今日议程<em>300 × 220</em></h2></div>
+      <span class="tag">默认推荐</span>
+    </div>
+    <div class="grid" id="gridA"></div>
+    <ul class="spec-list">
+      <li>header 42px：今天 · 11.01 周日 + 进度 2/7 + home</li>
+      <li>主体 3 × 44px：时间 46px 右对齐 / 细环 18px / 标题 13 · 500</li>
+      <li>footer 38px：＋ 说一句 / 还有 N 件 ›（无时间、计数收进 N）</li>
+      <li>空状态：今天没有安排；仅当前/下一项有强调色</li>
+    </ul>
+  </section>
+
+  <section class="lab-section">
+    <div class="section-head">
+      <div><p class="eyebrow">CONCEPT B · LIST</p><h2>清单<em>300 × 260</em></h2></div>
+      <span class="tag">今天 / 全部</span>
+    </div>
+    <div class="grid" id="gridB"></div>
+    <ul class="spec-list">
+      <li>header 44px：今天 / 全部小切换 + home</li>
+      <li>主体 4 × 40px：细环 18px / 标题 13 · 500 / 时间或计数 chip 右置</li>
+      <li>footer 34px：＋ 说一句 / 还有 N 件 ›（超出 +N 收口）</li>
+      <li>计数任务：n/target 为 10px 小 chip，最多一行</li>
+    </ul>
+  </section>
+
+  <section class="lab-section">
+    <div class="section-head">
+      <div><p class="eyebrow">STATES · EDGE CASES</p><h2>状态<em>空 / 计数 / hover</em></h2></div>
+    </div>
+    <div class="grid" id="gridStates"></div>
+    <ul class="spec-list">
+      <li>空状态保留 footer 入口，不空白</li>
+      <li>计数显示 n/target chip；完成在 170ms 内消失</li>
+      <li>hover 才出现左侧拖拽把手与右下 resize 角</li>
+    </ul>
+  </section>
+
+  <section class="lab-section">
+    <div class="section-head"><div><p class="eyebrow">DESIGN NOTES</p><h2>为什么更利落</h2></div></div>
+    <div class="notes">
+      <div class="note-card">
+        <p class="eyebrow">01 · 信息层级</p>
+        <h3>一个卡片只回答一个问题</h3>
+        <p>A 主体只放「有时间」的事项，最多 3 条；无时间 / 计数不混入主体，收进「还有 N 件」。B 主体只放清单，最多 4 条，超出 +N。时间列与勾选圈之间不再有伪时间轴竖线，改用「时间 → 勾选 → 标题」三段固定网格，扫读更快。</p>
+      </div>
+      <div class="note-card">
+        <p class="eyebrow">02 · 质感与细节</p>
+        <h3>更脆：去掉模糊与纸纹</h3>
+        <p>小组件面积小，噪点和半透明反而显糊。改为 96–97% 暖白 + 1px 珍珠灰 + 两层柔阴 + 内白高光；时间列 tabular numerals，勾选圈 18px/1.25px；仅当前项用一点主题色。footer 提供「＋ 说一句」入口，拖拽把手 / resize 角只在 hover 出现，静态截图更干净。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="lab-foot">
+    <span>非产品 UI · 仅视觉评审用</span>
+    <span>截图模式：widget-lab.html?shot=A&amp;theme=pink</span>
+    <span>配套：docs/prototype-v0.4.html · docs/12-visual-spec.md v0.4</span>
+  </footer>
+</div>
+
+<div id="shotStage"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------------- demo data ---------------- */
+var TODAY = '2026-11-01';
+var A_ITEMS = [
+  { time:'11:30', title:'交周报' },
+  { time:'14:45', title:'与张总开会' },
+  { time:'16:30', title:'取快递' }
+];
+var B_ITEMS = [
+  { time:'11:30', title:'交周报' },
+  { time:'14:45', title:'与张总开会' },
+  { time:'16:30', title:'取快递' },
+  { time:'', title:'买牛奶' }
+];
+var B_ITEMS_COUNT = [
+  { time:'11:30', title:'交周报' },
+  { time:'', title:'喝水', count:'2/3' },
+  { time:'16:30', title:'取快递' },
+  { time:'', title:'买牛奶' }
+];
+
+/* ---------------- icons ---------------- */
+var SVG = {
+  home: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.6 8.7L10 3.3l6.4 5.4v7.3a.9.9 0 0 1-.9.9H4.5a.9.9 0 0 1-.9-.9V8.7z"/><path d="M8.1 16.9v-4.3h3.8v4.3"/></svg>'
+};
+var PINKS = { pink:'#E7D8DC', sage:'#C8D1C7', blue:'#AFC0C8' };
+var THEMES = [['pink','雾粉','MIST PINK'],['sage','鼠尾草绿','SAGE'],['blue','雾蓝 · 石墨','MIST BLUE']];
+
+/* ---------------- helpers ---------------- */
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function ring(p){
+  var r=6.2, c=2*Math.PI*r;
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><circle class="track" cx="8" cy="8" r="'+r+'"></circle>' +
+    '<circle class="arc" cx="8" cy="8" r="'+r+'" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+(c*(1-clamp(p,0,1))).toFixed(1)+'"></circle></svg>';
+}
+function clamp(v,a,b){ return Math.min(b,Math.max(a,v)); }
+function grip(){ return '<span class="w-grip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>'; }
+function homeBtn(){ return '<button class="w-home" data-home aria-label="进入软件首页" title="进入软件首页">'+SVG.home+'</button>'; }
+function createBtn(){ return '<button class="w-create" data-widget-action="capture"><span class="plus">＋</span>说一句</button>'; }
+function moreBtn(n){ return n>0 ? '<button class="w-more" data-widget-action="more">还有 '+n+' 件<span class="chev">›</span></button>' : ''; }
+function resizeHandle(){ return '<span class="w-resize" title="拖拽缩放"></span>'; }
+
+/* ---------------- templates ---------------- */
+function widgetAgenda(theme, opt){
+  opt = opt || {};
+  var items = opt.items || A_ITEMS;
+  var more = opt.more != null ? opt.more : 4;
+  var done = opt.done != null ? opt.done : 2;
+  var total = opt.total != null ? opt.total : 7;
+  var forceHover = opt.forceHover ? ' force-hover' : '';
+  var rows = items.map(function(it, i){
+    return '<div class="w-row'+(i===0?' is-next':'')+'" data-wtask="a'+i+'" role="button" tabindex="0">' +
+      '<span class="w-time">'+esc(it.time)+'</span><span class="w-check"></span><span class="w-title">'+esc(it.title)+'</span></div>';
+  }).join('');
+  var body = items.length
+    ? '<div class="w-rows">'+rows+'</div>'
+    : '<div class="w-empty"><p class="e-main">今天没有安排</p><p class="e-sub">点下方「＋ 说一句」开始</p></div>';
+  return '<div class="widget theme-'+theme+forceHover+'" data-widget-template="agenda" style="width:300px;height:220px">' + grip() +
+    '<header class="w-header"><div class="w-head-left"><span class="w-eyebrow">今天</span>' +
+      '<span class="w-date"><span class="d">11.01</span><span class="wd">周日</span></span></div>' +
+      '<div class="w-head-right"><span class="w-progress">'+ring(done/total)+'<span class="n">'+done+'/'+total+'</span></span>'+homeBtn()+'</div></header>' +
+    body +
+    '<div class="w-footer">'+createBtn()+moreBtn(more)+'</div>' + resizeHandle() + '</div>';
+}
+
+function widgetList(theme, opt){
+  opt = opt || {};
+  var items = opt.items || B_ITEMS;
+  var more = opt.more != null ? opt.more : 3;
+  var scope = opt.scope || 'today';
+  var forceHover = opt.forceHover ? ' force-hover' : '';
+  var rows = items.map(function(it, i){
+    var meta = it.count ? '<span class="w-chip">'+esc(it.count)+'</span>' : (it.time ? '<span class="w-meta">'+esc(it.time)+'</span>' : '');
+    return '<div class="w-row'+(i===0?' is-next':'')+'" data-wtask="b'+i+'" role="button" tabindex="0">' +
+      '<span class="w-check"></span><span class="w-title">'+esc(it.title)+'</span>'+meta+'</div>';
+  }).join('');
+  var body = items.length
+    ? '<div class="w-rows w-rows--list">'+rows+'</div>'
+    : '<div class="w-empty"><p class="e-main">'+(scope==='today'?'今天没有待办':'没有未完成的事')+'</p><p class="e-sub">点下方「＋ 说一句」开始</p></div>';
+  return '<div class="widget theme-'+theme+forceHover+'" data-widget-template="list" style="width:300px;height:260px">' + grip() +
+    '<header class="w-header"><div class="w-seg">' +
+      '<button class="'+(scope==='today'?'active':'')+'">今天</button><button class="'+(scope==='all'?'active':'')+'">全部</button></div>' +
+      '<div class="w-head-right">'+homeBtn()+'</div></header>' +
+    body +
+    '<div class="w-footer">'+createBtn()+moreBtn(more)+'</div>' + resizeHandle() + '</div>';
+}
+
+/* ---------------- lab rendering ---------------- */
+function cell(theme, name, en, size, ratio, html){
+  return '<div class="lab-cell"><div class="lab-stage">'+html+'</div>' +
+    '<div class="lab-caption"><span class="tdot '+theme+'"></span><b>'+name+'</b><span>'+en+'</span>' +
+      '<span class="size">'+size+' · '+ratio+'</span></div></div>';
+}
+function renderLab(){
+  var ga = document.getElementById('gridA');
+  var gb = document.getElementById('gridB');
+  var gs = document.getElementById('gridStates');
+  if (!ga || !gb || !gs) return;
+  ga.innerHTML = THEMES.map(function(t){
+    return cell(t[0], t[1], t[2], '300×220', '≈3:2', widgetAgenda(t[0], {}));
+  }).join('');
+  gb.innerHTML = THEMES.map(function(t){
+    return cell(t[0], t[1], t[2], '300×260', '≈7:6', widgetList(t[0], {}));
+  }).join('');
+  gs.innerHTML =
+    cell('pink', '空状态', 'EMPTY', '300×220', '≈3:2', widgetAgenda('pink', { items:[], more:2 })) +
+    cell('pink', '计数 / 超额', 'COUNT', '300×260', '≈7:6', widgetList('pink', { items:B_ITEMS_COUNT, more:3 })) +
+    cell('pink', 'hover 手柄', 'HOVER', '300×220', '≈3:2', widgetAgenda('pink', { forceHover:true }));
+}
+
+/* ---------------- 2x screenshot mode ---------------- */
+function applyShot(){
+  var q = new URLSearchParams(location.search);
+  var shot = q.get('shot');
+  var theme = q.get('theme') || 'pink';
+  if (!shot) return;
+  var stage = document.getElementById('shotStage');
+  if (!stage) return;
+  var html = '';
+  if (shot === 'B') html = widgetList(theme, {});
+  else if (shot === 'empty') html = widgetAgenda(theme, { items:[], more:2 });
+  else if (shot === 'count') html = widgetList(theme, { items:B_ITEMS_COUNT, more:3 });
+  else html = widgetAgenda(theme, {});
+  document.body.classList.add('shot');
+  stage.innerHTML = html;
+}
+
+renderLab();
+applyShot();
+})();
+</script>
+</body>
+</html>
