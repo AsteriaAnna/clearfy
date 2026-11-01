@@ -14,6 +14,7 @@ import {
   restoreEvent,
   saveAiKeys,
   todayISO,
+  transcribeStream,
   updateEvent,
 } from "./api";
 
@@ -101,6 +102,17 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRef = useRef<{
+    stream: MediaStream;
+    ctx: AudioContext;
+    source: MediaStreamAudioSourceNode;
+    processor: ScriptProcessorNode;
+    chunks: Float32Array[];
+  } | null>(null);
+  const recordingRef = useRef(false);
+  const toggleRecordingRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -131,6 +143,7 @@ export default function App() {
     if (!isTauri) return;
     let unlistenOpen: (() => void) | undefined;
     let unlistenCapture: (() => void) | undefined;
+    let unlistenVoice: (() => void) | undefined;
     void import("@tauri-apps/api/event").then(({ listen }) => {
       void listen("clarify://open-today", () => {
         setView("today");
@@ -143,13 +156,29 @@ export default function App() {
         setSelected(null);
         setTimeout(() => captureRef.current?.focus(), 80);
       }).then((fn) => { unlistenCapture = fn; });
+      void listen("clarify://voice", () => {
+        setView("today");
+        setSelected(null);
+        toggleRecordingRef.current();
+      }).then((fn) => { unlistenVoice = fn; });
     });
     return () => {
       unlistenOpen?.();
       unlistenCapture?.();
+      unlistenVoice?.();
     };
   }, [template]);
 
+  useEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
+
+  useEffect(() => {
+    toggleRecordingRef.current = () => {
+      if (recordingRef.current) void stopRecording();
+      else void startRecording();
+    };
+  });
   async function onComplete(ev: ClarifyEvent) {
     try {
       if (isCount(ev)) await incrementCount(ev.id);
@@ -184,6 +213,60 @@ export default function App() {
       await load();
     } catch (e) {
       setError(String(e));
+    }
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      });
+      const ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(stream);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const chunks: Float32Array[] = [];
+      processor.onaudioprocess = (e) => {
+        chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      };
+      source.connect(processor);
+      processor.connect(ctx.destination);
+      mediaRef.current = { stream, ctx, source, processor, chunks };
+      setRecording(true);
+    } catch (e) {
+      setError(`无法使用麦克风：${String(e)}`);
+    }
+  }
+
+  async function stopRecording() {
+    const rec = mediaRef.current;
+    if (!rec) return;
+    mediaRef.current = null;
+    setRecording(false);
+    setTranscribing(true);
+    try {
+      rec.processor.disconnect();
+      rec.source.disconnect();
+      rec.stream.getTracks().forEach((t) => t.stop());
+      const sampleRate = rec.ctx.sampleRate;
+      await rec.ctx.close();
+      const pcm = encodePcm16k(rec.chunks, sampleRate);
+      if (pcm.length < 3200) {
+        setError("太短了，再说一次？");
+        return;
+      }
+      const text = await transcribeStream(bytesToBase64(pcm));
+      const clean = text.trim();
+      if (!clean) {
+        setError("没听清，再说一次？");
+        return;
+      }
+      const outcome = await aiParse(clean);
+      setToast(`「${clean}」→ 已安排 ${outcome.created.length} 项`);
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setTranscribing(false);
     }
   }
 
@@ -355,11 +438,18 @@ export default function App() {
           </main>
 
           <footer className="capture">
-            <button className="mic" title="语音（M2 接入）">🎙</button>
+            <button
+              className={`mic${recording ? " recording" : ""}`}
+              title={recording ? "停止录音" : "语音"}
+              disabled={transcribing}
+              onClick={() => (recording ? void stopRecording() : void startRecording())}
+            >
+              {transcribing ? "…" : recording ? "■" : "🎙"}
+            </button>
             <input
               ref={captureRef}
               value={draft}
-              placeholder="说一句，或输入待办…（试试：明天下午三点开会）"
+              placeholder={transcribing ? "正在识别…" : recording ? "正在听…说完点一下 ■" : "说一句，或输入待办…（试试：明天下午三点开会）"}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void onCreate(); }}
             />
@@ -383,8 +473,39 @@ export default function App() {
   );
 }
 
-function Settings({ theme, setTheme, onBack }: { theme: Theme; setTheme: (t: Theme) => void; onBack: () => void }) {
-  const [ai, setAi] = useState<AiStatus | null>(null);
+function encodePcm16k(chunks: Float32Array[], sampleRate: number): Uint8Array {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const merged = new Float32Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    merged.set(c, off);
+    off += c.length;
+  }
+  const ratio = sampleRate / 16000;
+  const outLen = Math.max(1, Math.floor(merged.length / ratio));
+  const pcm = new Int16Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const frac = pos - i0;
+    const a = merged[i0] ?? 0;
+    const b = merged[i0 + 1] ?? a;
+    const s = Math.max(-1, Math.min(1, a * (1 - frac) + b * frac));
+    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return new Uint8Array(pcm.buffer);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const step = 0x8000;
+  for (let i = 0; i < bytes.length; i += step) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + step));
+  }
+  return btoa(bin);
+}
+
+function Settings({ theme, setTheme, onBack }: { theme: Theme; setTheme: (t: Theme) => void; onBack: () => void }) {  const [ai, setAi] = useState<AiStatus | null>(null);
   const [dsKey, setDsKey] = useState("");
   const [dbKey, setDbKey] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
@@ -434,11 +555,12 @@ function Settings({ theme, setTheme, onBack }: { theme: Theme; setTheme: (t: The
           <button className="primary" onClick={() => void saveKeys()}>保存 Key</button>
           {saved && <span className="muted">{saved}</span>}
         </div>
-        <p className="muted">Key 只存本机 AppData，不写入仓库；正式版将迁移到 Windows 凭据管理器。豆包语音资源需在控制台开通后可用。</p>
+        <p className="muted">Key 只存本机 AppData，不写入仓库；正式版将迁移到 Windows 凭据管理器。语音使用豆包流式识别（2.0 小时版）。</p>
       </div>
       <h2>关于</h2>
       <p className="muted">Clarify · 本地运行 · 无账号 · 数据只在本机</p>
-      <p className="muted">M3 开发版：DeepSeek 解析已接入；豆包语音等待服务开通。</p>
+      <p className="muted">M3 开发版：DeepSeek 解析 + 豆包流式语音已接入。</p>
+      <p className="muted">全局快捷键：Ctrl+Alt+Space 文字捕捉 · Ctrl+Alt+V 语音捕捉（再按一次结束）</p>
     </main>
   );
 }

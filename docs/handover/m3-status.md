@@ -56,15 +56,23 @@
   - 创建：`跟张总开会`（`2026-11-02T07:00:00Z`）+ `买牛奶`（无时间，标题已去掉“顺便”）
   - 截图：`docs/screenshots/m3-ai-capture.png`
 
-## 豆包语音（Key 有效，服务未开通）
+## 豆包语音（已通，流式 2.0）
 
-- Key 作为 `X-Api-Key` 可用（鉴权通过，不是 401）
-- 客户端的 `transcribe_audio` 已按「录音文件识别·极速版」实现：
-  - `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash`
-  - `X-Api-Resource-Id: volc.bigasr.auc_turbo`，音频 base64 JSON
-- 实测返回 **403 / code 45000030 `requested resource not granted`**：账号未开通该语音资源
-- **需要用户操作**：豆包语音控制台 → 开通管理 → 开通「录音文件识别·极速版（大模型）」；或告诉我已开通的具体服务，我再改资源 ID / 协议
-- 语音按钮暂未接录音；开通后接 WebView2 录音 → WAV → `transcribe_audio` → `ai_parse`
+- Key 鉴权：`X-Api-Key`（新版豆包语音控制台 API Key）
+- 用户已开通「录音文件识别」与「大模型流式语音识别」；**优先流式**
+- 流式实现：`wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async`
+  - `X-Api-Resource-Id: volc.seedasr.sauc.duration`（2.0 小时版；`concurrent` 也可）
+  - 二进制协议：full client request（JSON）→ audio-only 200ms/包 → final flag；服务端 gzip JSON 响应
+- 前端录音：WebView2 `getUserMedia` → WebAudio `ScriptProcessor` 采集 → 16k/16bit/mono PCM → base64
+- 命令：`transcribe_stream(pcm_base64)` → 识别文本 → `ai_parse` → 创建
+- **端到端实测通过**：
+  - 用 Windows TTS 生成“明天下午三点跟张总开会，顺便买牛奶”音频，Chromium fake-audio 设备驱动麦克风
+  - CDP 点击录音 → 识别 `明天下午3点跟张总开会。` → DeepSeek → 创建 `跟张总开会`（2026-11-02 15:00）
+  - 截图：`docs/screenshots/m3-voice-stream.png`
+- 全局热键：
+  - `Ctrl+Alt+Space`：显示主窗 + 聚焦文字捕捉
+  - `Ctrl+Alt+V`：显示主窗 + 开始/停止语音捕捉
+- 录音文件极速版（flash, `volc.bigasr.auc_turbo`）仍返回 403 未授权；当前不使用，保留代码作为非流式备选
 
 ## 安全提醒
 

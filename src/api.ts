@@ -214,4 +214,9 @@ export async function transcribeAudio(audioBase64: string, format: string): Prom
   return invoke<string>("transcribe_audio", { audioBase64, format });
 }
 
+export async function transcribeStream(pcmBase64: string): Promise<string> {
+  if (!isTauri) throw new Error("浏览器预览不支持语音识别");
+  return invoke<string>("transcribe_stream", { pcmBase64 });
+}
+
 export { todayISO };

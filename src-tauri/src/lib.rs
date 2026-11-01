@@ -182,6 +182,22 @@ async fn transcribe_audio(
 }
 
 #[tauri::command]
+async fn transcribe_stream(app: AppHandle, pcm_base64: String) -> Result<String, String> {
+    let cfg = ai::load_config(&app);
+    let key = cfg
+        .doubao_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or("未配置豆包 Key")?
+        .to_string();
+    let pcm = base64::engine::general_purpose::STANDARD
+        .decode(pcm_base64.as_bytes())
+        .map_err(|e| e.to_string())?;
+    ai::stream_transcribe(&pcm, &key).await
+}
+
+#[tauri::command]
 fn create_from_capture(state: State<'_, AppState>, text: String) -> Result<Vec<Event>, String> {
     let offset = Local::now().offset().local_minus_utc() / 60;
     let items = clarify_core::rules::parse(&text, state.clock.now_utc(), state.clock.local_date(), offset);
@@ -221,18 +237,29 @@ fn db_path(app: &tauri::AppHandle) -> std::path::PathBuf {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let capture_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space);
-    let handler_shortcut = capture_shortcut.clone();
+    let voice_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+    let handler_capture = capture_shortcut.clone();
+    let handler_voice = voice_shortcut.clone();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
-                    if shortcut == &handler_shortcut && event.state() == ShortcutState::Pressed {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    if shortcut == &handler_capture {
                         if let Some(main) = app.get_webview_window("main") {
                             let _ = main.show();
                             let _ = main.set_focus();
                         }
                         let _ = app.emit("clarify://capture", ());
+                    } else if shortcut == &handler_voice {
+                        if let Some(main) = app.get_webview_window("main") {
+                            let _ = main.show();
+                            let _ = main.set_focus();
+                        }
+                        let _ = app.emit("clarify://voice", ());
                     }
                 })
                 .build(),
@@ -250,6 +277,9 @@ pub fn run() {
             });
             app.global_shortcut()
                 .register(capture_shortcut)
+                .map_err(|e| e.to_string())?;
+            app.global_shortcut()
+                .register(voice_shortcut)
                 .map_err(|e| e.to_string())?;
 
             // 浮窗：独立透明窗口，300×220 起，A 最高 396 / B 最高 420
@@ -297,7 +327,8 @@ pub fn run() {
             ai_status,
             save_ai_keys,
             ai_parse,
-            transcribe_audio
+            transcribe_audio,
+            transcribe_stream
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -123,6 +123,12 @@ h2 { font-size: 15px; font-weight: 600; margin: 22px 0 10px; letter-spacing: .2p
 }
 .capture .mic { width: 32px; height: 32px; border-radius: 10px; color: var(--accent-ink); font-size: 15px; }
 .capture .mic:hover { background: var(--accent-soft); }
+.capture .mic.recording { background: var(--accent); color: #fff; animation: mic-pulse 1.2s ease-in-out infinite; }
+.capture .mic:disabled { opacity: .55; cursor: default; }
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
+  50% { box-shadow: 0 0 0 6px var(--accent-soft); }
+}
 .capture input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 13px; padding: 6px 4px; }
 .capture input::placeholder { color: var(--faint); }
 .capture .primary { background: var(--accent); color: #fff; padding: 7px 14px; border-radius: 10px; font-size: 12.5px; }
