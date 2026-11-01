@@ -25,6 +25,7 @@
 | [docs/research/tech-stack.md](docs/research/tech-stack.md) | 技术选型研究报告（桌面壳、本机 ASR 部分有效；本机 LLM 降为可选） |
 | [docs/research/product-ux.md](docs/research/product-ux.md) | 产品与交互研究报告 |
 | [docs/adr/0001-ai-service-model.md](docs/adr/0001-ai-service-model.md) | ADR-0001 草案：AI 能力由谁提供、API Key 放在哪（待拍板） |
+| [docs/ops/official-ai-gateway-setup.md](docs/ops/official-ai-gateway-setup.md) | 官方 AI 服务的注册/部署操作指南（云函数、费用、合规） |
 | `docs/research/spike-results.md` | 技术尖峰实测结果（待建） |
 
 ## 产品一句话
