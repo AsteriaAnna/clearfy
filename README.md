@@ -6,10 +6,10 @@
 
 ## 当前状态
 
-- **阶段**：开发前文档 + 红队审查 + 视觉 v0.3 完成，悬浮窗已专项重做为 v0.4（2026-11-01）；待你确认悬浮窗取舍与 8 个产品决策后进入 M1
-- **最新权威记录**：[docs/00-product-decisions.md](docs/00-product-decisions.md)（产品定义 v1.1）
-- **核心定义**：无收件箱/标签/通知/首启引导/备份导出；只有"未完成/已完成"；完成 24h 内可恢复、之后物理删除；事件 = 动作标题 + 可选字段（时间/重复/计数）；显示模板 A 时间轴 / B 清单；主窗 = 一个主页面 + 设置
-- **下一步**：你确认悬浮窗与新原型 → 视觉 v1.0 冻结 + ADR-0008 定稿 → 装 Rust/MSVC 环境 → Tauri 空壳 + Spike S4 → M1 后端与底层
+- **阶段**：开发前文档 + 红队审查 + 视觉 v0.3 完成；悬浮窗经 v0.4 重做、v0.5 细化（时间细线标记 / 下拉拉伸显示全部 / 计数可超额）（2026-11-01）；待你确认视觉收口与剩余产品决策后进入 M1
+- **最新权威记录**：[docs/00-product-decisions.md](docs/00-product-decisions.md)（产品定义 v1.1 + 计数/悬浮窗补充）
+- **核心定义**：无收件箱/标签/通知/首启引导/备份导出；只有"未完成/已完成"；完成 24h 内可恢复、之后物理删除；事件 = 动作标题 + 可选字段（时间/重复/计数）；显示模板 A 时间轴 / B 清单；主窗 = 一个主页面 + 设置；计数目标可超额、周期结束才过期
+- **下一步**：你确认悬浮窗 v0.5 → 视觉 v1.0 冻结 + 文档同步 + ADR-0008 定稿 → 装 Rust/MSVC 环境 → Tauri 空壳 + Spike S4 → M1 后端与底层
 
 ## 文档索引
 
@@ -29,8 +29,8 @@
 | [10-risks-decisions.md](docs/10-risks-decisions.md) | 决策登记（D 系列）与风险登记（R 系列） |
 | [11-release-ops.md](docs/11-release-ops.md) | 发布/签名/更新/隐私/许可/运营 |
 | [eval/](docs/eval/) | 62 条中文口语评估集 + 期望 JSON + 指标规范 |
-| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.4.html](docs/prototype-v0.4.html) | 视觉 v0.4（暖纸感+三主题；悬浮窗已按 300×220/300×260 重做）；对比页 [widget-lab.html](docs/widget-lab.html) + [截图](docs/screenshots/) |
-| [prototype-v0.3.html](docs/prototype-v0.3.html)、[v0.2](docs/prototype-v0.2.html) | 历史视觉原型 |
+| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.5.html](docs/prototype-v0.5.html) | 视觉 v0.5（暖纸感+三主题；悬浮窗时间细线/下拉拉伸/计数可超额）；对比页 [widget-lab.html](docs/widget-lab.html) + [截图](docs/screenshots/) |
+| [prototype-v0.4.html](docs/prototype-v0.4.html)、[v0.3](docs/prototype-v0.3.html)、[v0.2](docs/prototype-v0.2.html) | 历史视觉原型 |
 | [docs/handover/](docs/handover/) | 红队审查报告、交接手册（进行中） |
 | [research/](docs/research/) | 早期技术/产品研究（历史证据） |
 | [design-v0.1~v0.3](docs/design-v0.3.md) | 历史设计稿（已被产品决策取代） |
