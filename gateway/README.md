@@ -79,13 +79,21 @@ powershell -ExecutionPolicy Bypass -File tools/pack.ps1
 
 ### 3. 验证
 
+> 阿里云函数 URL 默认会在响应头加 `content-disposition: attachment`，用浏览器打开会**下载文件**而不是显示页面，这是 FC 的默认行为，不代表网关失败。
+
+用命令行验证：
+
+```powershell
+(Invoke-WebRequest 'https://你的函数URL/v1/health').Content
+```
+
+或：
+
 ```bash
 curl https://你的函数URL/v1/health
-# → {"ok":true,"deepseekConfigured":true,...}
-
-curl "https://你的函数URL/v1/quota?deviceId=test-device"
-# → 免费额度 20 / 300
 ```
+
+看到 `{"ok":true,...}` 即成功。需要浏览器页面时可绑定自定义域名，或在后续配置 API 网关。
 
 ### 4. 生成激活码
 

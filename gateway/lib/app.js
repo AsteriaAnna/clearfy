@@ -33,6 +33,26 @@ async function handle({ method, path, headers, body, query }) {
   const ip = clientIp(headers);
   const q = query || {};
 
+  if (method === 'GET' && (p === '/' || p === '/index.html')) {
+    const ok = Boolean(process.env.DEEPSEEK_API_KEY && process.env.DOUBAO_API_KEY);
+    return {
+      status: 200,
+      html: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>Clarify Gateway</title>
+<style>body{font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#faf9f6;color:#333532;margin:0;display:grid;place-items:center;min-height:100vh}
+.card{background:#fff;border:1px solid #ece9e2;border-radius:18px;padding:32px 40px;box-shadow:0 18px 40px rgba(51,53,50,.08);max-width:520px}
+h1{font-size:20px;margin:0 0 6px}p{color:#8a8880;font-size:13px;line-height:1.8}code{background:#f3f1ec;padding:2px 6px;border-radius:6px}
+.badge{display:inline-block;background:${ok ? '#e7ede5' : '#f3e7ea'};color:${ok ? '#56705a' : '#8a5b66'};border-radius:20px;padding:4px 10px;font-size:12px;margin-bottom:16px}
+a{color:#8a5b66}</style></head><body><div class="card">
+<div class="badge">${ok ? '网关运行中' : '网关配置不完整'}</div>
+<h1>Clarify 官方网关</h1>
+<p>这是 AI 网关，不是网页应用。客户端会调用它完成语音识别和待办解析。</p>
+<p>健康检查：<a href="/v1/health">/v1/health</a></p>
+<p>免费额度：${Number(process.env.FREE_PARSE_PER_DAY || 5)} 次解析 + ${Number(process.env.FREE_VOICE_SECONDS_PER_DAY || 30)} 秒语音 / 天</p>
+</div></body></html>`,
+    };
+  }
+
   if (method === 'GET' && (p === '/v1/health' || p === '/health')) {
     return {
       status: 200,

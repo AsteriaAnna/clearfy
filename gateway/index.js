@@ -37,8 +37,22 @@ function response(statusCode, payload) {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
+      'content-disposition': 'inline',
     },
     body: JSON.stringify(payload),
+    isBase64Encoded: false,
+  };
+}
+
+function htmlResponse(statusCode, body) {
+  return {
+    statusCode,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-disposition': 'inline',
+    },
+    body,
     isBase64Encoded: false,
   };
 }
@@ -47,6 +61,7 @@ exports.handler = async (event) => {
   try {
     const req = normalize(event);
     const res = await handle(req);
+    if (res.html) return htmlResponse(res.status, res.html);
     return response(res.status, res.body);
   } catch (e) {
     const status = e.status || 500;

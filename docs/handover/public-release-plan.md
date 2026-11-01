@@ -60,6 +60,7 @@
 - ✅ 激活码 Secret 在本机 `%LOCALAPPDATA%\com.clarify.desktop\gateway-activation-secret.txt`
 - ⚠️ `s deploy` 输出把函数环境变量打印出来了；公开前建议轮换 DeepSeek/豆包 Key
 - ⚠️ 当前函数 URL 匿名可调，客户端计额度可被绕开；有量后加 Tablestore/Redis/API 网关限流
+- ⚠️ FC 默认域名会在响应头强制加 `content-disposition: attachment`，浏览器打开会下载 JSON；用命令行验证，客户端不受影响。需要浏览器展示可后续绑自定义域名/API 网关
 
 ## 待用户操作（部署）
 
