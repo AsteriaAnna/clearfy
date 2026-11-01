@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AiStatus,
   ClarifyEvent,
   NewEvent,
+  aiParse,
+  aiStatus,
   completeEvent,
-  createFromCapture,
   deleteEvent,
   incrementCount,
   isTauri,
   listCompleted,
   listOpen,
   restoreEvent,
+  saveAiKeys,
   todayISO,
   updateEvent,
 } from "./api";
@@ -170,9 +173,14 @@ export default function App() {
     const title = draft.trim();
     if (!title) return;
     try {
-      const created = await createFromCapture(title);
+      const outcome = await aiParse(title);
       setDraft("");
-      setToast(created.length > 1 ? `已创建 ${created.length} 项` : "已创建");
+      const n = outcome.created.length;
+      if (outcome.fallback) {
+        setToast(`已创建 ${n} 项 · ${outcome.warning ?? "规则模式"}`);
+      } else {
+        setToast(`AI 已安排 ${n} 项`);
+      }
       await load();
     } catch (e) {
       setError(String(e));
@@ -376,6 +384,25 @@ export default function App() {
 }
 
 function Settings({ theme, setTheme, onBack }: { theme: Theme; setTheme: (t: Theme) => void; onBack: () => void }) {
+  const [ai, setAi] = useState<AiStatus | null>(null);
+  const [dsKey, setDsKey] = useState("");
+  const [dbKey, setDbKey] = useState("");
+  const [saved, setSaved] = useState<string | null>(null);
+  useEffect(() => {
+    void aiStatus().then(setAi).catch(() => {});
+  }, []);
+  async function saveKeys() {
+    try {
+      const next = await saveAiKeys(dsKey.trim() || null, dbKey.trim() || null);
+      setAi(next);
+      setDsKey("");
+      setDbKey("");
+      setSaved("已保存到本机");
+      setTimeout(() => setSaved(null), 2500);
+    } catch (e) {
+      setSaved(String(e));
+    }
+  }
   return (
     <main className="content settings">
       <div className="back" onClick={onBack}>← 返回</div>
@@ -387,9 +414,31 @@ function Settings({ theme, setTheme, onBack }: { theme: Theme; setTheme: (t: The
           </button>
         ))}
       </div>
+      <h2>AI 服务</h2>
+      <div className="set-card">
+        <div className="field-row">
+          <span>DeepSeek 文本解析</span>
+          <span className={ai?.deepseek_configured ? "pill ok" : "pill"}>{ai?.deepseek_configured ? "已配置" : "未配置"}</span>
+        </div>
+        <div className="field-row">
+          <span>豆包语音识别</span>
+          <span className={ai?.doubao_configured ? "pill ok" : "pill"}>{ai?.doubao_configured ? "已配置" : "未配置"}</span>
+        </div>
+        <label className="key-field">DeepSeek API Key
+          <input type="password" value={dsKey} placeholder="sk-..." onChange={(e) => setDsKey(e.target.value)} />
+        </label>
+        <label className="key-field">豆包语音 API Key
+          <input type="password" value={dbKey} placeholder="控制台签发的 API Key" onChange={(e) => setDbKey(e.target.value)} />
+        </label>
+        <div className="ai-actions">
+          <button className="primary" onClick={() => void saveKeys()}>保存 Key</button>
+          {saved && <span className="muted">{saved}</span>}
+        </div>
+        <p className="muted">Key 只存本机 AppData，不写入仓库；正式版将迁移到 Windows 凭据管理器。豆包语音资源需在控制台开通后可用。</p>
+      </div>
       <h2>关于</h2>
       <p className="muted">Clarify · 本地运行 · 无账号 · 数据只在本机</p>
-      <p className="muted">M2 开发版：AI 语音与官方解析将在下一阶段接入。</p>
+      <p className="muted">M3 开发版：DeepSeek 解析已接入；豆包语音等待服务开通。</p>
     </main>
   );
 }

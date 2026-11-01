@@ -180,4 +180,38 @@ export async function createFromCapture(text: string): Promise<ClarifyEvent[]> {
   return invoke<ClarifyEvent[]>("create_from_capture", { text });
 }
 
+export interface AiStatus {
+  deepseek_configured: boolean;
+  doubao_configured: boolean;
+}
+
+export interface AiParseOutcome {
+  created: ClarifyEvent[];
+  fallback: boolean;
+  warning?: string | null;
+}
+
+export async function aiStatus(): Promise<AiStatus> {
+  if (!isTauri) return { deepseek_configured: false, doubao_configured: false };
+  return invoke<AiStatus>("ai_status");
+}
+
+export async function saveAiKeys(deepseekKey: string | null, doubaoKey: string | null): Promise<AiStatus> {
+  if (!isTauri) throw new Error("仅桌面应用支持保存 Key");
+  return invoke<AiStatus>("save_ai_keys", { deepseekKey, doubaoKey });
+}
+
+export async function aiParse(text: string): Promise<AiParseOutcome> {
+  if (!isTauri) {
+    const created = await createFromCapture(text);
+    return { created, fallback: true, warning: "浏览器预览为规则模式" };
+  }
+  return invoke<AiParseOutcome>("ai_parse", { text });
+}
+
+export async function transcribeAudio(audioBase64: string, format: string): Promise<string> {
+  if (!isTauri) throw new Error("浏览器预览不支持语音识别");
+  return invoke<string>("transcribe_audio", { audioBase64, format });
+}
+
 export { todayISO };

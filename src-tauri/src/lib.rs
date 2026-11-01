@@ -1,9 +1,12 @@
 use std::sync::Mutex;
 
+use base64::Engine;
 use chrono::Local;
 use clarify_core::{Clock, Event, NewEvent, Store, SystemClock};
-use tauri::{Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+pub mod ai;
 
 struct AppState {
     store: Mutex<Store>,
@@ -66,6 +69,116 @@ fn delete_event(state: State<'_, AppState>, id: String) -> Result<(), String> {
 fn purge_expired(state: State<'_, AppState>) -> Result<clarify_core::PurgeResult, String> {
     let store = state.store.lock().map_err(err)?;
     store.purge(&state.clock).map_err(err)
+}
+
+#[derive(serde::Serialize)]
+struct AiParseOutcome {
+    created: Vec<Event>,
+    fallback: bool,
+    warning: Option<String>,
+}
+
+fn rules_events(app: &AppHandle, text: &str) -> Result<Vec<NewEvent>, String> {
+    let state = app.state::<AppState>();
+    let offset = Local::now().offset().local_minus_utc() / 60;
+    Ok(clarify_core::rules::parse(text, state.clock.now_utc(), state.clock.local_date(), offset)
+        .into_iter()
+        .map(|item| item.event)
+        .collect())
+}
+
+#[tauri::command]
+fn ai_status(app: AppHandle) -> ai::AiStatus {
+    ai::status(&app)
+}
+
+#[tauri::command]
+fn save_ai_keys(
+    app: AppHandle,
+    deepseek_key: Option<String>,
+    doubao_key: Option<String>,
+) -> Result<ai::AiStatus, String> {
+    let mut cfg = ai::load_config(&app);
+    if let Some(k) = deepseek_key {
+        cfg.deepseek_key = if k.trim().is_empty() { None } else { Some(k.trim().to_string()) };
+    }
+    if let Some(k) = doubao_key {
+        cfg.doubao_key = if k.trim().is_empty() { None } else { Some(k.trim().to_string()) };
+    }
+    ai::save_config(&app, &cfg)?;
+    Ok(ai::status(&app))
+}
+
+#[tauri::command]
+async fn ai_parse(app: AppHandle, text: String) -> Result<AiParseOutcome, String> {
+    let cfg = ai::load_config(&app);
+    let (now_local, offset) = ai::now_local_strings();
+    let key = cfg
+        .deepseek_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    let (items, fallback, warning) = match key {
+        Some(key) => match ai::deepseek_parse(&text, &now_local, offset, &key).await {
+            Ok(v) if !v.is_empty() => (v, false, None),
+            Ok(_) => (
+                rules_events(&app, &text)?,
+                true,
+                Some("AI 未解析出任务，已用规则模式".to_string()),
+            ),
+            Err(e) => (
+                rules_events(&app, &text)?,
+                true,
+                Some(format!("AI 解析失败，已用规则模式：{e}")),
+            ),
+        },
+        None => (
+            rules_events(&app, &text)?,
+            true,
+            Some("未配置 DeepSeek Key，当前为规则模式".to_string()),
+        ),
+    };
+    let state = app.state::<AppState>();
+    let store = state.store.lock().map_err(err)?;
+    let mut created = Vec::new();
+    let mut skipped = Vec::new();
+    for item in items {
+        match store.create(&item, &state.clock) {
+            Ok(ev) => created.push(ev),
+            Err(e) => skipped.push(e.to_string()),
+        }
+    }
+    if created.is_empty() {
+        return Err(format!("没有创建成功：{}", skipped.join("；")));
+    }
+    let warning = warning.or_else(|| {
+        if skipped.is_empty() {
+            None
+        } else {
+            Some(format!("部分未创建：{}", skipped.join("；")))
+        }
+    });
+    Ok(AiParseOutcome { created, fallback, warning })
+}
+
+#[tauri::command]
+async fn transcribe_audio(
+    app: AppHandle,
+    audio_base64: String,
+    format: String,
+) -> Result<String, String> {
+    let cfg = ai::load_config(&app);
+    let key = cfg
+        .doubao_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or("未配置豆包 Key")?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(audio_base64.as_bytes())
+        .map_err(|e| e.to_string())?;
+    ai::doubao_transcribe(&bytes, &format, key).await
 }
 
 #[tauri::command]
@@ -180,7 +293,11 @@ pub fn run() {
             delete_event,
             purge_expired,
             open_main_today,
-            create_from_capture
+            create_from_capture,
+            ai_status,
+            save_ai_keys,
+            ai_parse,
+            transcribe_audio
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

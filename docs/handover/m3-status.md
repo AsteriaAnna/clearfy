@@ -40,3 +40,34 @@
 2. **网关客户端**：`/v1/transcribe`、`/v1/parse`（需要网络；先 mock 服务/契约测试）
 3. **语音**：录音 + 上传 + 失败兜底（等用户提供 ASR Key 或部署官方网关后联调）
 4. 视觉打磨与窗口位置记忆；准备第一个可安装包
+
+---
+
+# AI 真实接入（2026-11-01 晚，追加）
+
+## DeepSeek（已通）
+
+- 新增 `src-tauri/src/ai.rs`：`deepseek_parse` 调用 `deepseek-flash`（JSON Output + `thinking: disabled`）
+- 新增命令：`ai_parse`（AI 解析→创建，失败自动回退规则）、`ai_status`、`save_ai_keys`
+- 主窗捕捉条改为 `aiParse`；成功显示「AI 已安排 N 项 ✓」，失败/未配置显示规则模式说明
+- Key 存本机 `%LOCALAPPDATA%\com.clarify.desktop\ai-config.json`（开发期明文，不进仓库/文档/日志；正式版迁移 Windows 凭据管理器）
+- **端到端实测通过**：全局热键 → 捕捉条 → DeepSeek → 创建 2 条
+  - 输入“明天下午三点跟张总开会，顺便买牛奶”
+  - 创建：`跟张总开会`（`2026-11-02T07:00:00Z`）+ `买牛奶`（无时间，标题已去掉“顺便”）
+  - 截图：`docs/screenshots/m3-ai-capture.png`
+
+## 豆包语音（Key 有效，服务未开通）
+
+- Key 作为 `X-Api-Key` 可用（鉴权通过，不是 401）
+- 客户端的 `transcribe_audio` 已按「录音文件识别·极速版」实现：
+  - `POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash`
+  - `X-Api-Resource-Id: volc.bigasr.auc_turbo`，音频 base64 JSON
+- 实测返回 **403 / code 45000030 `requested resource not granted`**：账号未开通该语音资源
+- **需要用户操作**：豆包语音控制台 → 开通管理 → 开通「录音文件识别·极速版（大模型）」；或告诉我已开通的具体服务，我再改资源 ID / 协议
+- 语音按钮暂未接录音；开通后接 WebView2 录音 → WAV → `transcribe_audio` → `ai_parse`
+
+## 安全提醒
+
+- 两个 Key 已在对话中出现；建议本轮测试后在控制台重置/轮换
+- 本仓库不含 Key（已 grep 确认）；Key 只在 AppData 本地配置中
+
