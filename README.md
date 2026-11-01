@@ -29,7 +29,7 @@
 | [10-risks-decisions.md](docs/10-risks-decisions.md) | 决策登记（D 系列）与风险登记（R 系列） |
 | [11-release-ops.md](docs/11-release-ops.md) | 发布/签名/更新/隐私/许可/运营 |
 | [eval/](docs/eval/) | 62 条中文口语评估集 + 期望 JSON + 指标规范 |
-| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.2.html](docs/prototype-v0.2.html) | 视觉初稿（进行中） |
+| [12-visual-spec.md](docs/12-visual-spec.md)、[prototype-v0.3.html](docs/prototype-v0.3.html) | 视觉 v0.3（暖纸感+三主题，待你确认；[v0.2 原型](docs/prototype-v0.2.html) 为历史） |
 | [docs/handover/](docs/handover/) | 红队审查报告、交接手册（进行中） |
 | [research/](docs/research/) | 早期技术/产品研究（历史证据） |
 | [design-v0.1~v0.3](docs/design-v0.3.md) | 历史设计稿（已被产品决策取代） |
