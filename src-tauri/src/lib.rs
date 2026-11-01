@@ -1,7 +1,9 @@
 use std::sync::Mutex;
 
-use clarify_core::{Event, NewEvent, Store, SystemClock};
+use chrono::Local;
+use clarify_core::{Clock, Event, NewEvent, Store, SystemClock};
 use tauri::{Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 struct AppState {
     store: Mutex<Store>,
@@ -67,6 +69,24 @@ fn purge_expired(state: State<'_, AppState>) -> Result<clarify_core::PurgeResult
 }
 
 #[tauri::command]
+fn create_from_capture(state: State<'_, AppState>, text: String) -> Result<Vec<Event>, String> {
+    let offset = Local::now().offset().local_minus_utc() / 60;
+    let items = clarify_core::rules::parse(&text, state.clock.now_utc(), state.clock.local_date(), offset);
+    if items.is_empty() {
+        return Err("没有识别出可创建的内容".into());
+    }
+    let store = state.store.lock().map_err(err)?;
+    let mut created = Vec::new();
+    for item in items {
+        match store.create(&item.event, &state.clock) {
+            Ok(ev) => created.push(ev),
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Ok(created)
+}
+
+#[tauri::command]
 fn open_main_today(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.show();
@@ -87,9 +107,24 @@ fn db_path(app: &tauri::AppHandle) -> std::path::PathBuf {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let capture_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space);
+    let handler_shortcut = capture_shortcut.clone();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(move |app, shortcut, event| {
+                    if shortcut == &handler_shortcut && event.state() == ShortcutState::Pressed {
+                        if let Some(main) = app.get_webview_window("main") {
+                            let _ = main.show();
+                            let _ = main.set_focus();
+                        }
+                        let _ = app.emit("clarify://capture", ());
+                    }
+                })
+                .build(),
+        )
+        .setup(move |app| {
             let path = db_path(app.handle());
             let store = Store::open(path.to_string_lossy().as_ref())
                 .expect("failed to open clarify.db");
@@ -100,6 +135,9 @@ pub fn run() {
                 store: Mutex::new(store),
                 clock,
             });
+            app.global_shortcut()
+                .register(capture_shortcut)
+                .map_err(|e| e.to_string())?;
 
             // 浮窗：独立透明窗口，300×220 起，A 最高 396 / B 最高 420
             let builder = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
@@ -141,7 +179,8 @@ pub fn run() {
             update_event,
             delete_event,
             purge_expired,
-            open_main_today
+            open_main_today,
+            create_from_capture
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

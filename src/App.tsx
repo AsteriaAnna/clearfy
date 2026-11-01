@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ClarifyEvent,
   NewEvent,
-  createEvent,
   completeEvent,
+  createFromCapture,
   deleteEvent,
   incrementCount,
   isTauri,
@@ -96,6 +96,8 @@ export default function App() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const captureRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -124,16 +126,25 @@ export default function App() {
 
   useEffect(() => {
     if (!isTauri) return;
-    let unlisten: (() => void) | undefined;
-    void import("@tauri-apps/api/event").then(({ listen }) =>
-      listen("clarify://open-today", () => {
+    let unlistenOpen: (() => void) | undefined;
+    let unlistenCapture: (() => void) | undefined;
+    void import("@tauri-apps/api/event").then(({ listen }) => {
+      void listen("clarify://open-today", () => {
         setView("today");
         setSelected(null);
         if (template === "a") setScale("day");
         else setFilter("today");
-      }).then((fn) => { unlisten = fn; }),
-    );
-    return () => unlisten?.();
+      }).then((fn) => { unlistenOpen = fn; });
+      void listen("clarify://capture", () => {
+        setView("today");
+        setSelected(null);
+        setTimeout(() => captureRef.current?.focus(), 80);
+      }).then((fn) => { unlistenCapture = fn; });
+    });
+    return () => {
+      unlistenOpen?.();
+      unlistenCapture?.();
+    };
   }, [template]);
 
   async function onComplete(ev: ClarifyEvent) {
@@ -158,9 +169,14 @@ export default function App() {
   async function onCreate() {
     const title = draft.trim();
     if (!title) return;
-    await createEvent({ title });
-    setDraft("");
-    await load();
+    try {
+      const created = await createFromCapture(title);
+      setDraft("");
+      setToast(created.length > 1 ? `已创建 ${created.length} 项` : "已创建");
+      await load();
+    } catch (e) {
+      setError(String(e));
+    }
   }
 
   const today = todayISO();
@@ -333,8 +349,9 @@ export default function App() {
           <footer className="capture">
             <button className="mic" title="语音（M2 接入）">🎙</button>
             <input
+              ref={captureRef}
               value={draft}
-              placeholder="说一句，或输入待办…"
+              placeholder="说一句，或输入待办…（试试：明天下午三点开会）"
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void onCreate(); }}
             />
@@ -344,6 +361,7 @@ export default function App() {
       )}
 
       {error && <div className="error-toast" onClick={() => setError(null)}>{error}</div>}
+      {toast && <div className="ok-toast" onClick={() => setToast(null)}>{toast} ✓</div>}
       {selected && (
         <DetailDrawer
           event={selected}

@@ -5,6 +5,7 @@
 
 pub mod clock;
 pub mod model;
+pub mod rules;
 pub mod store;
 
 pub use clock::{Clock, FixedClock, SystemClock};

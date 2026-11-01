@@ -165,4 +165,19 @@ export async function deleteEvent(id: string): Promise<void> {
   return invoke<void>("delete_event", { id });
 }
 
+/** 规则模式：一句话 → 解析 → 创建（无 AI 时的兜底链路）。 */
+export async function createFromCapture(text: string): Promise<ClarifyEvent[]> {
+  if (!isTauri) {
+    const ev = {
+      id: `m${Date.now()}`,
+      title: text.trim(),
+      count_progress: 0,
+      created_at: new Date().toISOString(),
+    } as ClarifyEvent;
+    mock.unshift(ev);
+    return [clone(ev)];
+  }
+  return invoke<ClarifyEvent[]>("create_from_capture", { text });
+}
+
 export { todayISO };
