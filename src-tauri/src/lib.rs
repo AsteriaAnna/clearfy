@@ -52,39 +52,51 @@ fn list_completed(state: State<'_, AppState>) -> Result<Vec<Event>, String> {
 }
 
 #[tauri::command]
-fn create_event(state: State<'_, AppState>, new: NewEvent) -> Result<Event, String> {
+fn create_event(app: AppHandle, state: State<'_, AppState>, new: NewEvent) -> Result<Event, String> {
     let store = state.store.lock().map_err(err)?;
-    store.create(&new, &state.clock).map_err(err)
+    let ev = store.create(&new, &state.clock).map_err(err)?;
+    let _ = app.emit("clarify://changed", ());
+    Ok(ev)
 }
 
 #[tauri::command]
-fn complete_event(state: State<'_, AppState>, id: String) -> Result<Event, String> {
+fn complete_event(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<Event, String> {
     let store = state.store.lock().map_err(err)?;
-    store.complete(&id, &state.clock).map_err(err)
+    let ev = store.complete(&id, &state.clock).map_err(err)?;
+    let _ = app.emit("clarify://changed", ());
+    Ok(ev)
 }
 
 #[tauri::command]
-fn restore_event(state: State<'_, AppState>, id: String) -> Result<Event, String> {
+fn restore_event(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<Event, String> {
     let store = state.store.lock().map_err(err)?;
-    store.restore(&id).map_err(err)
+    let ev = store.restore(&id).map_err(err)?;
+    let _ = app.emit("clarify://changed", ());
+    Ok(ev)
 }
 
 #[tauri::command]
-fn increment_count(state: State<'_, AppState>, id: String) -> Result<Event, String> {
+fn increment_count(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<Event, String> {
     let store = state.store.lock().map_err(err)?;
-    store.increment_count(&id, &state.clock).map_err(err)
+    let ev = store.increment_count(&id, &state.clock).map_err(err)?;
+    let _ = app.emit("clarify://changed", ());
+    Ok(ev)
 }
 
 #[tauri::command]
-fn update_event(state: State<'_, AppState>, id: String, new: NewEvent) -> Result<Event, String> {
+fn update_event(app: AppHandle, state: State<'_, AppState>, id: String, new: NewEvent) -> Result<Event, String> {
     let store = state.store.lock().map_err(err)?;
-    store.update(&id, &new, &state.clock).map_err(err)
+    let ev = store.update(&id, &new, &state.clock).map_err(err)?;
+    let _ = app.emit("clarify://changed", ());
+    Ok(ev)
 }
 
 #[tauri::command]
-fn delete_event(state: State<'_, AppState>, id: String) -> Result<(), String> {
+fn delete_event(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<(), String> {
     let store = state.store.lock().map_err(err)?;
-    store.delete(&id).map_err(err)
+    store.delete(&id).map_err(err)?;
+    let _ = app.emit("clarify://changed", ());
+    Ok(())
 }
 
 #[tauri::command]
@@ -107,28 +119,6 @@ fn rules_events(app: &AppHandle, text: &str) -> Result<Vec<NewEvent>, String> {
         .into_iter()
         .map(|item| item.event)
         .collect())
-}
-
-#[tauri::command]
-fn ai_status(app: AppHandle) -> ai::AiStatus {
-    ai::status(&app)
-}
-
-#[tauri::command]
-fn save_ai_keys(
-    app: AppHandle,
-    deepseek_key: Option<String>,
-    doubao_key: Option<String>,
-) -> Result<ai::AiStatus, String> {
-    let mut cfg = ai::load_config(&app);
-    if let Some(k) = deepseek_key {
-        cfg.deepseek_key = if k.trim().is_empty() { None } else { Some(k.trim().to_string()) };
-    }
-    if let Some(k) = doubao_key {
-        cfg.doubao_key = if k.trim().is_empty() { None } else { Some(k.trim().to_string()) };
-    }
-    ai::save_config(&app, &cfg)?;
-    Ok(ai::status(&app))
 }
 
 #[tauri::command]
@@ -181,6 +171,7 @@ async fn ai_parse(app: AppHandle, text: String) -> Result<AiParseOutcome, String
             Some(format!("部分未创建：{}", skipped.join("；")))
         }
     });
+    let _ = app.emit("clarify://changed", ());
     Ok(AiParseOutcome { created, fallback, warning })
 }
 
@@ -220,7 +211,7 @@ async fn transcribe_stream(app: AppHandle, pcm_base64: String) -> Result<String,
 }
 
 #[tauri::command]
-fn create_from_capture(state: State<'_, AppState>, text: String) -> Result<Vec<Event>, String> {
+fn create_from_capture(app: AppHandle, state: State<'_, AppState>, text: String) -> Result<Vec<Event>, String> {
     let offset = Local::now().offset().local_minus_utc() / 60;
     let items = clarify_core::rules::parse(&text, state.clock.now_utc(), state.clock.local_date(), offset);
     if items.is_empty() {
@@ -234,6 +225,7 @@ fn create_from_capture(state: State<'_, AppState>, text: String) -> Result<Vec<E
             Err(e) => return Err(e.to_string()),
         }
     }
+    let _ = app.emit("clarify://changed", ());
     Ok(created)
 }
 
@@ -398,11 +390,11 @@ pub fn run() {
                 }
             }
 
-            // 浮窗：独立透明窗口，300×220 起，A 最高 396 / B 最高 420
+            // 浮窗：独立透明窗口，支持折叠为 64×64 符号
             let builder = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("overlay.html".into()))
                 .title("Clarify")
-                .inner_size(300.0, 220.0)
-                .min_inner_size(300.0, 180.0)
+                .inner_size(300.0, 260.0)
+                .min_inner_size(64.0, 64.0)
                 .max_inner_size(300.0, 420.0)
                 .decorations(false)
                 .transparent(true)
@@ -415,8 +407,8 @@ pub fn run() {
             if let Some(rect) = &wstate.overlay {
                 if rect_on_screen(app.handle(), rect) {
                     let scale = overlay.scale_factor().unwrap_or(1.0);
-                    let width = (300.0 * scale) as u32;
-                    let height = rect.height.clamp(180.0 * scale, 420.0 * scale) as u32;
+                    let width = rect.width.clamp(64.0 * scale, 300.0 * scale) as u32;
+                    let height = rect.height.clamp(64.0 * scale, 420.0 * scale) as u32;
                     let _ = overlay.set_size(PhysicalSize::new(width, height));
                     let _ = overlay.set_position(PhysicalPosition::new(rect.x, rect.y));
                     overlay_restored = true;
@@ -458,8 +450,6 @@ pub fn run() {
             purge_expired,
             open_main_today,
             create_from_capture,
-            ai_status,
-            save_ai_keys,
             ai_parse,
             transcribe_audio,
             transcribe_stream,

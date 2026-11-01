@@ -30,29 +30,24 @@ pub fn config_path(app: &AppHandle) -> PathBuf {
 }
 
 pub fn load_config(app: &AppHandle) -> AiConfig {
-    std::fs::read_to_string(config_path(app))
+    let mut cfg: AiConfig = std::fs::read_to_string(config_path(app))
         .ok()
         .and_then(|s| serde_json::from_str(s.trim_start_matches('\u{feff}')).ok())
-        .unwrap_or_default()
-}
-
-pub fn save_config(app: &AppHandle, cfg: &AiConfig) -> Result<(), String> {
-    let s = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
-    std::fs::write(config_path(app), s).map_err(|e| e.to_string())
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AiStatus {
-    pub deepseek_configured: bool,
-    pub doubao_configured: bool,
-}
-
-pub fn status(app: &AppHandle) -> AiStatus {
-    let cfg = load_config(app);
-    AiStatus {
-        deepseek_configured: cfg.deepseek_key.as_deref().map(str::trim).map(|s| !s.is_empty()).unwrap_or(false),
-        doubao_configured: cfg.doubao_key.as_deref().map(str::trim).map(|s| !s.is_empty()).unwrap_or(false),
+        .unwrap_or_default();
+    // 内置 Key：编译期注入（option_env），用户在界面上不需要配置。
+    if cfg.deepseek_key.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() {
+        cfg.deepseek_key = option_env!("CLARIFY_DEEPSEEK_KEY")
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
     }
+    if cfg.doubao_key.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() {
+        cfg.doubao_key = option_env!("CLARIFY_DOUBAO_KEY")
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+    }
+    cfg
 }
 
 #[derive(Debug, Deserialize)]
