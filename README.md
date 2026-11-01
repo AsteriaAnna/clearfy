@@ -37,6 +37,7 @@
 | [prototype-v0.1.html](docs/prototype-v0.1.html) | 旧线框（已过时，待删/替换为 v0.2） |
 | [ops/official-ai-gateway-setup.md](docs/ops/official-ai-gateway-setup.md) | 官方 AI 服务注册/部署指南（历史方案） |
 | [gateway/](gateway/) | 公开版官方网关（阿里云函数计算 + Tablestore 额度） |
+| [gateway-cloudflare/](gateway-cloudflare/) | 公开版官方网关（Cloudflare Workers + D1，早期部署用） |
 | [docs/handover/public-release-plan.md](docs/handover/public-release-plan.md) | 公开版决策与待办（MIT / GitHub / 网关） |
 | [LICENSE](LICENSE) | MIT 许可证 |
 

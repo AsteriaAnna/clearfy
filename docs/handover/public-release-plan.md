@@ -12,8 +12,9 @@
 | Key | 继续使用当前 DeepSeek / 豆包 Key，放在网关环境变量；暂不轮换 |
 | 免费额度 | 每设备每天 20 次解析 + 300 秒语音 |
 | 激活码 | HMAC 签名；可加解析次数、语音秒数、有效期；不需要账号 |
-| 额度存储 | 阿里云表格存储 Tablestore（`clarify_quota` 表） |
+| 额度存储 | 早期用 Cloudflare D1（免费额度）；阿里云备选 Tablestore |
 | 客户端配置 | 用户不需要配置 Key；可选填激活码 |
+| 早期部署 | **Cloudflare Workers + D1**（我可以 wrangler 部署）；阿里云 FC 作为大陆访问不稳时的备选 |
 
 ## 架构
 
@@ -31,13 +32,13 @@
 
 ## 已完成
 
-- `gateway/` Node.js 20 网关源码（本地已测：health / parse / transcribe / 激活码额度）
-- 免费额度 + 激活码校验 + Tablestore/内存两种存储
-- `gateway/README.md`：部署步骤
-- `gateway/tools/gen-activation.js`：激活码生成
-- `gateway/tools/pack.ps1`：生成上 FC 的 zip
+- `gateway/` Node.js 20 阿里云 FC 网关源码（本地已测：health / parse / transcribe / 激活码额度）
+- `gateway-cloudflare/` Cloudflare Workers + D1 网关源码（本地 wrangler dev 已测：health / parse / transcribe / D1 额度 / 激活码）
+- 免费额度 + 激活码校验 + 两种额度存储
+- 部署文档：`gateway/README.md`、`gateway-cloudflare/README.md`
+- 激活码生成：`gateway/tools/gen-activation.js`
 - `LICENSE`（MIT）
-- 网关代码没有 Key；Key 只在阿里云环境变量
+- 网关代码没有 Key；Key 只在云平台环境变量/Secrets
 
 ## 待用户操作（部署）
 

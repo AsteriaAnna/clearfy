@@ -1,0 +1,13 @@
+name = "clarify-gateway"
+main = "src/index.js"
+compatibility_date = "2026-10-30"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clarify-quota"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+FREE_PARSE_PER_DAY = "20"
+FREE_VOICE_SECONDS_PER_DAY = "300"
