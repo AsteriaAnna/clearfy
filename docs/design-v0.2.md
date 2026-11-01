@@ -1,5 +1,7 @@
 # Clarify 产品与技术设计讨论稿 v0.2
 
+> ⚠️ **已被 v0.3 取代**：v0.2 把"完全本地"理解为"完全离线 + 模型都在本机"，v0.3 已更正为"无服务器 + 云端 AI（用户自带 Key）"。看最新设计请读 `docs/design-v0.3.md`。
+
 > 状态：讨论稿（等待你拍板关键决策后转 ADR + PRD）
 > 日期：2026-11-01 ｜ 前版：v0.1
 > 调研输入：`docs/research/tech-stack.md`（技术选型）、`docs/research/product-ux.md`（产品交互）

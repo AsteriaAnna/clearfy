@@ -380,7 +380,7 @@ function viewWidget(){
 function viewSettings(){
   return `<div class="wrap" style="max-width:840px">
     <h1>设置</h1>
-    <div class="sub">所有数据都在本机 · 不登录 · 不联网（除模型下载）</div>
+    <div class="sub">数据都在本机 · 不登录 · AI 由你选的服务商直接提供（无服务器）</div>
     <div class="set-card"><h3>通用</h3>
       <div class="field"><div class="lab">开机启动<small>托盘常驻，提醒才可靠</small></div><button class="switch on" onclick="tog(this)"></button></div>
       <div class="field"><div class="lab">主题</div><div class="seg"><button class="on">跟随系统</button><button>浅色</button><button>深色</button></div></div>
@@ -388,11 +388,14 @@ function viewSettings(){
       <div class="field"><div class="lab">显示/隐藏悬浮窗</div><span class="val">Ctrl + Alt + W</span></div>
     </div>
     <div class="set-card"><h3>语音与 AI</h3>
-      <div class="field"><div class="lab">语音识别模型<small>中文 / 中英混说 · 本地运行</small></div><span class="val">SenseVoice Small · 231 MB <span class="pill">已就绪</span></span></div>
-      <div class="field"><div class="lab">理解模型<small>把一句话解析成结构化待办</small></div><span class="val">Qwen3 4B · 2.5 GB <span class="pill">已就绪</span></span></div>
-      <div class="field"><div class="lab">GPU 加速<small>检测到 RTX 4060，可加快解析</small></div><button class="switch on" onclick="tog(this)"></button></div>
+      <div class="field"><div class="lab">识别方式<small>本机：音频不出电脑、免费；云端：零下载、按量付费</small></div><div class="seg"><button class="on">本机识别</button><button>云端识别</button></div></div>
+      <div class="field"><div class="lab">语音识别模型<small>本机识别 · 首次下载约 228 MB</small></div><span class="val">SenseVoice Small · 已就绪</span></div>
+      <div class="field"><div class="lab">模型服务商<small>解析待办的大模型，客户端直连厂商</small></div><span class="val">DeepSeek <span class="pill">可切换</span></span></div>
+      <div class="field"><div class="lab">API Key<small>存 Windows 凭据管理器，不写明文</small></div><span class="val">已配置 · 可更换</span></div>
+      <div class="field"><div class="lab">模型名</div><span class="val">deepseek-chat</span></div>
+      <div class="field"><div class="lab">连接测试</div><span class="val"><button class="btn" style="padding:4px 10px;font-size:12px" onclick="toast('连接正常 · 延迟 420ms（演示）')">测试连接</button></span></div>
       <div class="field"><div class="lab">「明天」的默认时间</div><span class="val">09:00（可改为全天）</span></div>
-      <div class="field"><div class="lab">空闲 10 分钟后卸载模型<small>省内存/省电，下次捕捉前预热</small></div><button class="switch on" onclick="tog(this)"></button></div>
+      <div class="field"><div class="lab">本月 AI 用量<small>只在本机统计，不发到任何地方</small></div><span class="val">约 12 次 · 粗估 ¥0.02</span></div>
     </div>
     <div class="set-card"><h3>数据与隐私</h3>
       <div class="field"><div class="lab">数据位置</div><span class="val">AppData/Clarify/clarify.db <span class="pill">可迁移</span></span></div>
