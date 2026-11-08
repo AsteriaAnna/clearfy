@@ -8,3 +8,8 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Dependencies don't need debug info in dev builds. This also avoids MSVC error D8050
+# when PATH holds non-ASCII entries (cc-rs passes -Z7 to cl.exe whenever debug is on).
+[profile.dev.package."*"]
+debug = false
